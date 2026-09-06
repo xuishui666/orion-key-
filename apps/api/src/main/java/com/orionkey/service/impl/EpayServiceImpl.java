@@ -42,7 +42,8 @@ public class EpayServiceImpl implements EpayService {
         params.put("name", name);
         params.put("money", money.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
         params.put("clientip", clientIp != null ? clientIp : "127.0.0.1");
-        params.put("device", device != null && !device.isBlank() ? device : "pc");
+        params.put("device", device == null || device.isBlank() || "pc".equals(device) ? "pc"
+                : ("wechat".equals(device) || "alipay".equals(device) ? device : "mobile"));
 
         String sign = buildSign(config.key(), params);
         params.put("sign", sign);
@@ -104,16 +105,16 @@ public class EpayServiceImpl implements EpayService {
                     throw new BusinessException(ErrorCode.WEBHOOK_VERIFY_FAIL, "支付创建失败：" + msg);
                 }
 
-                String resultQrcode = qrcode != null ? qrcode : urlscheme;
+                String resultQrcode = qrcode;
 
                 // 网关未返回 payUrl 且为移动端请求时，将 qrcode（收银台页面 URL）作为 H5 跳转入口
                 String effectivePayUrl = payUrl;
-                if (effectivePayUrl == null && device != null && !"pc".equals(device) && resultQrcode != null) {
-                    effectivePayUrl = resultQrcode;
-                    log.info("Epay: gateway returned no payUrl, using qrcode URL as mobile redirect: {}", effectivePayUrl);
+                if (effectivePayUrl == null && device != null && !"pc".equals(device) && urlscheme != null) {
+                    effectivePayUrl = urlscheme;
+                    log.info("Epay: gateway returned no payUrl, using urlscheme as mobile redirect: {}", effectivePayUrl);
                 }
 
-                return new EpayResult(code, msg, tradeNo, effectivePayUrl, resultQrcode);
+                return new EpayResult(code, msg, tradeNo, effectivePayUrl, resultQrcode, urlscheme);
 
             } catch (BusinessException e) {
                 throw e; // 业务异常直接抛出，不重试

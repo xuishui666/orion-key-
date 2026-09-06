@@ -46,7 +46,7 @@ public class DeliverServiceImpl implements DeliverService {
 
         List<String> emails = (List<String>) request.get("emails");
         if (emails != null && !emails.isEmpty()) {
-            List<Order> emailOrders = orderRepository.findByEmailInOrderByCreatedAtDesc(emails);
+            List<Order> emailOrders = orderRepository.findByEmailInAndIsDeletedOrderByCreatedAtDesc(emails, 0);
             emailOrders.forEach(o -> orderIds.add(o.getId()));
         }
 

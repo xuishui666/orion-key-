@@ -14,52 +14,40 @@ interface TurnstileProps {
   className?: string
 }
 
-// 全局脚本加载状态
-let scriptLoaded = false
-let scriptLoading = false
-const loadCallbacks: (() => void)[] = []
+let scriptPromise: Promise<void> | null = null
 
 function loadScript(): Promise<void> {
-  if (scriptLoaded) return Promise.resolve()
-
-  return new Promise((resolve) => {
-    if (scriptLoading) {
-      loadCallbacks.push(resolve)
-      return
-    }
-    scriptLoading = true
-
+  if (scriptPromise) return scriptPromise
+  scriptPromise = new Promise<void>((resolve, reject) => {
     const script = document.createElement("script")
+    const timer = window.setTimeout(() => {
+      script.remove()
+      reject(new Error("Turnstile load timed out"))
+    }, 15000)
     script.src = TURNSTILE_SCRIPT_URL
     script.async = true
-    script.onload = () => {
-      scriptLoaded = true
-      scriptLoading = false
-      resolve()
-      loadCallbacks.forEach((cb) => cb())
-      loadCallbacks.length = 0
-    }
+    script.onload = () => { window.clearTimeout(timer); resolve() }
     script.onerror = () => {
-      scriptLoading = false
-      resolve() // 脚本加载失败也不阻塞
+      window.clearTimeout(timer)
+      script.remove()
+      reject(new Error("Turnstile script failed"))
     }
     document.head.appendChild(script)
-  })
+  }).catch(error => { scriptPromise = null; throw error })
+  return scriptPromise
 }
 
 /**
- * Cloudflare Turnstile 组件（Managed 模式）
- *
- * 正常用户完全无感，可疑时自动出现复选框。
- * token 单次有效，提交失败后调用 reset() 获取新 token。
- */
+ * Cloudflare Turnstile 组件（Managed 模式） *
+ * 正常用户完全无感，可疑时自动出现复选框。 * token 单次有效，提交失败后调用 reset() 获取新 token。 */
 export function Turnstile({ onSuccess, onError, className }: TurnstileProps) {
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
   const widgetIdRef = useRef<string | null>(null)
   const { config } = useSiteConfig()
   const { resolvedTheme } = useTheme()
   // 从后端 /api/site/config 获取 site key（运行时读取，不依赖构建时环境变量）
-  // turnstile_site_key 是后端动态注入的字段，不在 SiteConfig 接口定义中
   const siteKey = config ? (config as unknown as Record<string, unknown>).turnstile_site_key as string | undefined : undefined
 
   useEffect(() => {
@@ -76,7 +64,11 @@ export function Turnstile({ onSuccess, onError, className }: TurnstileProps) {
         remove: (widgetId: string) => void
       } | undefined
 
-      if (!turnstile) return
+      if (!turnstile) {
+        setFailed(true)
+        onError?.()
+        return
+      }
 
       // 防止重复渲染
       if (widgetIdRef.current) {
@@ -91,6 +83,11 @@ export function Turnstile({ onSuccess, onError, className }: TurnstileProps) {
         theme: resolvedTheme === "dark" ? "dark" : "light",
         size: "flexible",
       })
+    }).catch(() => {
+      if (mounted) {
+        setFailed(true)
+        onError?.()
+      }
     })
 
     return () => {
@@ -105,12 +102,17 @@ export function Turnstile({ onSuccess, onError, className }: TurnstileProps) {
         widgetIdRef.current = null
       }
     }
-  }, [siteKey, resolvedTheme, onSuccess, onError])
+  }, [siteKey, resolvedTheme, onSuccess, onError, attempt])
 
-  // 无 site key 时不渲染（Turnstile 未配置/关闭）
   if (!siteKey) return null
 
-  return <div ref={containerRef} className={className} />
+  return <div className={className}>
+    <div ref={containerRef} />
+    {failed && <button type="button" className="text-sm text-destructive underline" onClick={() => {
+      setFailed(false)
+      setAttempt(value => value + 1)
+    }}>验证加载失败，点击重试</button>}
+  </div>
 }
 
 /** 重置 Turnstile 组件获取新 token（提交失败后调用） */
@@ -121,33 +123,17 @@ export function resetTurnstile() {
   turnstile?.reset()
 }
 
-/**
- * Hook: 管理 Turnstile token 状态
- *
- * 使用示例：
- * ```tsx
- * const { turnstileToken, setTurnstileToken, turnstileReady, handleTurnstileReset } = useTurnstile()
- *
- * const handleSubmit = async () => {
- *   try {
- *     setTurnstileHeaders(turnstileToken)
- *     await orderApi.create(data)
- *   } catch (err) {
- *     handleTurnstileReset()
- *   }
- * }
- *
- * return <Turnstile onSuccess={setTurnstileToken} onError={handleTurnstileReset} />
- * ```
- */
 export function useTurnstile() {
   const [turnstileToken, setTurnstileToken] = useState<string>("")
-  const turnstileReady = !!turnstileToken
+  const { config } = useSiteConfig()
+  const siteKey = config ? (config as unknown as Record<string, unknown>).turnstile_site_key as string | undefined : undefined
+  const turnstileRequired = !!siteKey
+  const turnstileReady = config != null && (!turnstileRequired || !!turnstileToken)
 
   const handleTurnstileReset = useCallback(() => {
     setTurnstileToken("")
     resetTurnstile()
   }, [])
 
-  return { turnstileToken, setTurnstileToken, turnstileReady, handleTurnstileReset }
+  return { turnstileToken, setTurnstileToken, turnstileRequired, turnstileReady, handleTurnstileReset }
 }

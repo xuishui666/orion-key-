@@ -7,6 +7,7 @@ import com.orionkey.service.AdminCardKeyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -52,6 +53,20 @@ public class AdminCardKeyController {
     public ApiResponse<Void> invalidateCardKey(@PathVariable UUID id) {
         adminCardKeyService.invalidateCardKey(id);
         return ApiResponse.success();
+    }
+
+    @LogOperation(action = "cardkey.delete", targetType = "CARD_KEY", targetId = "#id", detail = "'删除卡密'")
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deleteCardKey(@PathVariable UUID id) {
+        adminCardKeyService.deleteCardKey(id);
+        return ApiResponse.success();
+    }
+
+    @LogOperation(action = "cardkey.batch_delete", targetType = "CARD_KEY", detail = "'批量删除卡密'")
+    @PostMapping("/batch-delete")
+    public ApiResponse<?> batchDeleteCardKeys(@RequestBody Map<String, List<UUID>> request) {
+        int count = adminCardKeyService.batchDeleteCardKeys(request.getOrDefault("ids", List.of()));
+        return ApiResponse.success(Map.of("deleted_count", count));
     }
 
     @LogOperation(action = "cardkey.invalidate", targetType = "CARD_KEY", detail = "'批量作废'")

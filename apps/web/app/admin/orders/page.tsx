@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, ChevronDown, Eye, Download, ChevronLeft, ChevronRight, X, CheckCircle } from "lucide-react"
+import { Search, ChevronDown, Eye, Download, ChevronLeft, ChevronRight, X, CheckCircle, Trash2 } from "lucide-react"
 import { cn, stripInvisible } from "@/lib/utils"
 import { useLocale } from "@/lib/context"
 import { toast } from "sonner"
-import { adminOrderApi, adminCardKeyApi, withMockFallback } from "@/services/api"
+import { adminOrderApi, adminCardKeyApi, withMockFallback, getApiErrorMessage } from "@/services/api"
 import { mockAdminOrderList, mockOrderCardKeys } from "@/lib/mock-data"
 import { OrderStatusBadge } from "@/components/shared/order-status-badge"
 import { PaymentIcon, getPaymentLabel } from "@/components/shared/payment-icon"
@@ -40,6 +40,32 @@ export default function AdminOrdersPage() {
   }
 
   const [orders, setOrders] = useState<AdminOrderItem[]>([])
+  const [selected, setSelected] = useState<string[]>([])
+  const [deleting, setDeleting] = useState(false)
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
+  const [revenue, setRevenue] = useState<Awaited<ReturnType<typeof adminOrderApi.getRevenueStats>> | null>(null)
+  const [statsLoading, setStatsLoading] = useState(false)
+  const fetchRevenue = async () => {
+    setStatsLoading(true)
+    try {
+      setRevenue(await adminOrderApi.getRevenueStats({ start_date: startDate || undefined, end_date: endDate || undefined }))
+    } catch (err) { toast.error(getApiErrorMessage(err, t)) }
+    finally { setStatsLoading(false) }
+  }
+  const deleteOrders = async (ids: string[]) => {
+    if (!ids.length || !window.confirm(`确认隐藏这 ${ids.length} 个订单？支付记录将保留。`)) return
+    setDeleting(true)
+    try {
+      const result = await adminOrderApi.batchDelete(ids)
+      toast.success(`已删除 ${result.deleted_count} 个订单`)
+      setSelected([])
+      setShowDetail(null)
+      await fetchOrders()
+      setRevenue(null)
+    } catch (err) { toast.error(getApiErrorMessage(err, t)) }
+    finally { setDeleting(false) }
+  }
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -72,6 +98,7 @@ export default function AdminOrdersPage() {
         })
       )
       setOrders(data.list)
+      setSelected([])
       setTotal(data.pagination.total)
     } catch {
       setOrders([])
@@ -146,6 +173,22 @@ export default function AdminOrdersPage() {
         </button>
       </div>
 
+      <section className="space-y-3 border-y border-border py-4">
+        <h2 className="text-base font-semibold">营业额查询</h2>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-sm">开始日期<input aria-label="开始日期" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="block rounded border border-input bg-background p-2" /></label>
+          <label className="text-sm">结束日期<input aria-label="结束日期" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="block rounded border border-input bg-background p-2" /></label>
+          <button type="button" disabled={statsLoading} onClick={fetchRevenue} className="flex items-center gap-2 rounded border border-input p-2 text-sm disabled:opacity-50"><Search className="h-4 w-4" />查询</button>
+        </div>
+        {revenue && <div className="space-y-3 text-sm">
+          <p>营业额：¥{Number(revenue.total_amount).toFixed(2)} · 已付款订单：{revenue.order_count}</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div><h3 className="font-medium">按渠道</h3>{revenue.by_payment_method.map((row, i) => <p key={i} className="flex justify-between gap-3 border-b py-2"><span>{row.payment_method}</span><span>¥{Number(row.amount).toFixed(2)} · {row.count} 单</span></p>)}</div>
+            <div><h3 className="font-medium">按商品</h3>{revenue.by_product.map((row, i) => <p key={i} className="flex justify-between gap-3 border-b py-2"><span className="break-all">{row.product_title}</span><span className="shrink-0">¥{Number(row.amount).toFixed(2)} · {row.count} 件</span></p>)}</div>
+          </div>
+        </div>}
+      </section>
+      <button type="button" disabled={!selected.length || deleting} onClick={() => deleteOrders(selected)} className="flex w-fit items-center gap-2 rounded border border-input p-2 text-sm text-destructive disabled:opacity-50"><Trash2 className="h-4 w-4" />批量删除 ({selected.length})</button>
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -208,6 +251,7 @@ export default function AdminOrdersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
+                <th className="px-3"><input type="checkbox" aria-label="选择本页订单" checked={orders.length > 0 && selected.length === orders.length} onChange={e => setSelected(e.target.checked ? orders.map(o => o.id) : [])} /></th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t("admin.orderNo")}</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">商品</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">数量</th>
@@ -236,6 +280,7 @@ export default function AdminOrdersPage() {
               ) : (
                 orders.map((order) => (
                   <tr key={order.id} className="border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors">
+                    <td className="px-3"><input type="checkbox" aria-label={`选择订单 ${order.id}`} checked={selected.includes(order.id)} onChange={e => setSelected(ids => e.target.checked ? [...ids, order.id] : ids.filter(id => id !== order.id))} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
                         <span
@@ -297,6 +342,7 @@ export default function AdminOrdersPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        <button type="button" title="删除订单" aria-label="删除订单" disabled={deleting} onClick={() => deleteOrders([order.id])} className="rounded p-2 text-destructive"><Trash2 className="h-4 w-4" /></button>
                         <button
                           type="button"
                           onClick={() => handleViewDetail(order)}

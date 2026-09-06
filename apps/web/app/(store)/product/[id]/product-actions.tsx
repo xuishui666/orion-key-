@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation"
 import { Zap, Minus, Plus, ShoppingCart, Package, TrendingUp } from "lucide-react"
 import { toast } from "sonner"
 import { useLocale, useAuth, useCart } from "@/lib/context"
-import { orderApi, withMockFallback, getApiErrorMessage, setTurnstileHeaders } from "@/services/api"
+import { orderApi, withMockFallback, getApiErrorMessage } from "@/services/api"
 import { mockCreateOrder } from "@/lib/mock-data"
 import { Turnstile, useTurnstile } from "@/components/shared/turnstile"
-import { cn, validateEmail, generateIdempotencyKey, getCurrencySymbol, detectPaymentDevice, isMobileDevice } from "@/lib/utils"
+import { cn, validateEmail, generateIdempotencyKey, getCurrencySymbol, detectPaymentDevice } from "@/lib/utils"
 import { PaymentSelector } from "@/components/shared/payment-selector"
 import type { ProductDetail, ProductSpec, PaymentChannelItem } from "@/types"
 
@@ -36,7 +36,7 @@ export function ProductActions({ product, channels }: ProductActionsProps) {
     enabledChannels.length > 0 ? enabledChannels[0].channel_code : ""
   )
   const [submitting, setSubmitting] = useState(false)
-  const { turnstileToken, setTurnstileToken, handleTurnstileReset } = useTurnstile()
+  const { turnstileToken, setTurnstileToken, turnstileReady, handleTurnstileReset } = useTurnstile()
 
   const currentPrice = selectedSpec ? selectedSpec.price : product.base_price
   const totalPrice = currentPrice * quantity
@@ -74,10 +74,13 @@ export function ProductActions({ product, channels }: ProductActionsProps) {
       toast.error(t("product.outOfStock"))
       return
     }
+    if (!turnstileReady) {
+      toast.error("人机验证未完成，请稍后重试")
+      return
+    }
 
     setSubmitting(true)
     try {
-      setTurnstileHeaders(turnstileToken)
       const device = detectPaymentDevice()
       const result = await withMockFallback(
         () => orderApi.create({
@@ -88,31 +91,11 @@ export function ProductActions({ product, channels }: ProductActionsProps) {
           payment_method: selectedPayment,
           idempotency_key: generateIdempotencyKey(),
           device,
-        }),
+        }, turnstileToken),
         () => mockCreateOrder(email, selectedPayment)
       )
       toast.success(t("checkout.processingOrder"))
-      const payUrlH5 = result.payment.pay_url || ""
-      const qr = result.payment.qrcode_url || result.payment.payment_url || ""
-      let payUrl = `/pay/${result.payment.order_id}?method=${selectedPayment}`
-      if (qr) payUrl += `&qr=${encodeURIComponent(qr)}`
-      if (payUrlH5) payUrl += `&payurl=${encodeURIComponent(payUrlH5)}`
-      // USDT 支付额外参数
-      if (result.payment.wallet_address) {
-        payUrl += `&wallet=${encodeURIComponent(result.payment.wallet_address)}`
-        payUrl += `&crypto_amount=${encodeURIComponent(result.payment.crypto_amount || "")}`
-        payUrl += `&chain=${encodeURIComponent(result.payment.chain || "")}`
-      }
-      // 移动端非 USDT 非微信：直接跳转网关支付页，避免中间经过 pay 页面的延迟
-      // 导致支付宝 H5 session token 过期（"会话超时"）
-      // 微信支付的 jspay 走 JSAPI（需微信浏览器），普通浏览器不能跳转，只能到 pay 页展示二维码
-      const isWechat = ["wechat", "wxpay"].includes(selectedPayment.toLowerCase())
-      if (isMobileDevice() && payUrlH5 && !selectedPayment.startsWith("usdt_") && !isWechat) {
-        sessionStorage.setItem(`pay_redirected_${result.payment.order_id}`, "1")
-        window.location.href = payUrlH5
-        return
-      }
-      router.push(payUrl)
+      router.push(`/pay/${result.payment.order_id}?method=${encodeURIComponent(selectedPayment)}`)
     } catch (err: unknown) {
       toast.error(getApiErrorMessage(err, t))
       handleTurnstileReset()
@@ -327,7 +310,7 @@ export function ProductActions({ product, channels }: ProductActionsProps) {
         <div className="flex gap-3">
           <button
             onClick={handleBuyNow}
-            disabled={submitting || isOutOfStock}
+            disabled={submitting || isOutOfStock || !turnstileReady}
             className="scheme-glow inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition-all hover:brightness-110 disabled:pointer-events-none disabled:opacity-50"
           >
             {submitting ? (

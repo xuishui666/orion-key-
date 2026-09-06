@@ -9,18 +9,20 @@
  * 准确率：~85-92% 唯一识别率。
  */
 
+import { safeStorageGet, safeStorageSet } from "@/lib/utils"
+
 const CACHE_KEY = "__device_id__"
 
 /** 获取 deviceId（优先 sessionStorage 缓存） */
 export async function getDeviceId(): Promise<string> {
   if (typeof window === "undefined") return ""
 
-  const cached = sessionStorage.getItem(CACHE_KEY)
+  const cached = safeStorageGet("sessionStorage", CACHE_KEY)
   if (cached) return cached
 
   try {
     const id = await generateDeviceId()
-    sessionStorage.setItem(CACHE_KEY, id)
+    safeStorageSet("sessionStorage", CACHE_KEY, id)
     return id
   } catch {
     // 采集失败不阻塞用户，返回空字符串（后端会降级为 IP 限流）

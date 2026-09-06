@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, type RefObject } from "react"
 import {
   Upload,
+  Trash2,
   Eye,
   Ban,
   Package,
@@ -17,7 +18,7 @@ import {
 import { cn, stripInvisible } from "@/lib/utils"
 import { useLocale } from "@/lib/context"
 import { toast } from "sonner"
-import { adminCardKeyApi, adminProductApi, withMockFallback } from "@/services/api"
+import { adminCardKeyApi, adminProductApi, withMockFallback, getApiErrorMessage } from "@/services/api"
 import {
   mockCardKeyStockList,
   mockImportBatchList,
@@ -42,6 +43,21 @@ export default function AdminCardKeysPage() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [detailItem, setDetailItem] = useState<CardKeyStockSummary | null>(null)
   const [detailKeys, setDetailKeys] = useState<CardKeyListItem[]>([])
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([])
+  const [deletingKeys, setDeletingKeys] = useState(false)
+  useEffect(() => { setSelectedKeys([]) }, [detailKeys])
+  const deleteKeys = async (ids: string[]) => {
+    if (!ids.length || !window.confirm(`确认删除这 ${ids.length} 条未售出卡密？`)) return
+    setDeletingKeys(true)
+    try {
+      const result = await adminCardKeyApi.batchDelete(ids)
+      toast.success(`已删除 ${result.deleted_count} 条卡密`)
+      setSelectedKeys([])
+      if (detailItem) await fetchDetailKeys(detailItem, detailPage)
+      await fetchStock()
+    } catch (err) { toast.error(getApiErrorMessage(err, t)) }
+    finally { setDeletingKeys(false) }
+  }
   const [detailTotal, setDetailTotal] = useState(0)
   const [detailPage, setDetailPage] = useState(1)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -584,9 +600,11 @@ export default function AdminCardKeysPage() {
             <p className="py-12 text-center text-sm text-muted-foreground">暂无卡密数据</p>
           ) : (
             <div className="overflow-x-auto">
+              <button type="button" disabled={!selectedKeys.length || deletingKeys} onClick={() => deleteKeys(selectedKeys)} className="mb-3 flex items-center gap-2 rounded border border-input p-2 text-sm text-destructive disabled:opacity-50"><Trash2 className="h-4 w-4" />批量删除 ({selectedKeys.length})</button>
               <table className="w-full text-sm table-fixed" onCopy={(e) => { const t = window.getSelection()?.toString(); if (t) { e.clipboardData.setData("text/plain", stripInvisible(t)); e.preventDefault() } }}>
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
+                    <th className="w-10 px-2"><input type="checkbox" aria-label="选择本页未售出卡密" checked={detailKeys.some(k => k.status !== "SOLD") && detailKeys.filter(k => k.status !== "SOLD").every(k => selectedKeys.includes(k.id))} onChange={e => setSelectedKeys(e.target.checked ? detailKeys.filter(k => k.status !== "SOLD").map(k => k.id) : [])} /></th>
                     <th className="w-[36%] px-3 py-2 text-left font-medium text-muted-foreground">卡密内容</th>
                     <th className="w-[8%] px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">状态</th>
                     <th className="w-[16%] px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">创建时间</th>
@@ -598,6 +616,7 @@ export default function AdminCardKeysPage() {
                 <tbody>
                   {detailKeys.map((key) => (
                     <tr key={key.id} className="border-b border-border/50 last:border-0">
+                      <td className="px-2"><input type="checkbox" aria-label={`选择卡密 ${key.id}`} disabled={key.status === "SOLD"} checked={selectedKeys.includes(key.id)} onChange={e => setSelectedKeys(ids => e.target.checked ? [...ids, key.id] : ids.filter(id => id !== key.id))} /></td>
                       <td className="px-3 py-2 font-mono text-xs text-foreground break-all">{key.content}</td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         <span className={cn(
@@ -620,6 +639,7 @@ export default function AdminCardKeysPage() {
                         {key.sold_at ? new Date(key.sold_at).toLocaleString() : "-"}
                       </td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
+                        {key.status !== "SOLD" && <button type="button" title="删除卡密" aria-label="删除卡密" disabled={deletingKeys} onClick={() => deleteKeys([key.id])} className="rounded p-1 text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>}
                         {(key.status === "AVAILABLE" || key.status === "LOCKED") && (
                           <button
                             type="button"

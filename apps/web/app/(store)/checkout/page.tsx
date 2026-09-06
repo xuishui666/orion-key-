@@ -7,10 +7,9 @@ import { toast } from "sonner"
 import { useLocale, useCart } from "@/lib/context"
 import { orderApi, paymentApi, withMockFallback, getApiErrorMessage } from "@/services/api"
 import { mockPaymentChannels, mockCreateOrder } from "@/lib/mock-data"
-import { validateEmail, generateIdempotencyKey, getCurrencySymbol, detectPaymentDevice, isMobileDevice } from "@/lib/utils"
+import { validateEmail, generateIdempotencyKey, getCurrencySymbol, detectPaymentDevice } from "@/lib/utils"
 import { PaymentSelector } from "@/components/shared/payment-selector"
 import { Turnstile, useTurnstile } from "@/components/shared/turnstile"
-import { setTurnstileHeaders } from "@/services/api"
 import type { PaymentChannelItem } from "@/types"
 
 export default function CheckoutPage() {
@@ -23,7 +22,7 @@ export default function CheckoutPage() {
   const [selectedPayment, setSelectedPayment] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const emailInputRef = useRef<HTMLInputElement>(null)
-  const { turnstileToken, setTurnstileToken, handleTurnstileReset } = useTurnstile()
+  const { turnstileToken, setTurnstileToken, turnstileReady, handleTurnstileReset } = useTurnstile()
 
   // Fetch payment channels on mount
   useEffect(() => {
@@ -64,10 +63,13 @@ export default function CheckoutPage() {
       toast.error(t("product.paymentMethod"))
       return
     }
+    if (!turnstileReady) {
+      toast.error("人机验证未完成，请稍后重试")
+      return
+    }
 
     setSubmitting(true)
     try {
-      setTurnstileHeaders(turnstileToken)
       const device = detectPaymentDevice()
       const result = await withMockFallback(
         () => orderApi.createFromCart({
@@ -75,32 +77,12 @@ export default function CheckoutPage() {
           payment_method: selectedPayment,
           idempotency_key: generateIdempotencyKey(),
           device,
-        }),
+        }, turnstileToken),
         () => mockCreateOrder(email, selectedPayment)
       )
       await refreshCart()
       toast.success(t("checkout.processingOrder"))
-      const payUrlH5 = result.payment.pay_url || ""
-      const qr = result.payment.qrcode_url || result.payment.payment_url || ""
-      let payUrl = `/pay/${result.payment.order_id}?method=${selectedPayment}`
-      if (qr) payUrl += `&qr=${encodeURIComponent(qr)}`
-      if (payUrlH5) payUrl += `&payurl=${encodeURIComponent(payUrlH5)}`
-      // USDT 支付额外参数
-      if (result.payment.wallet_address) {
-        payUrl += `&wallet=${encodeURIComponent(result.payment.wallet_address)}`
-        payUrl += `&crypto_amount=${encodeURIComponent(result.payment.crypto_amount || "")}`
-        payUrl += `&chain=${encodeURIComponent(result.payment.chain || "")}`
-      }
-      // 移动端非 USDT 非微信：直接跳转网关支付页，避免中间经过 pay 页面的延迟
-      // 导致支付宝 H5 session token 过期（"会话超时"）
-      // 微信支付的 jspay 走 JSAPI（需微信浏览器），普通浏览器不能跳转，只能到 pay 页展示二维码
-      const isWechat = ["wechat", "wxpay"].includes(selectedPayment.toLowerCase())
-      if (isMobileDevice() && payUrlH5 && !selectedPayment.startsWith("usdt_") && !isWechat) {
-        sessionStorage.setItem(`pay_redirected_${result.payment.order_id}`, "1")
-        window.location.href = payUrlH5
-        return
-      }
-      router.push(payUrl)
+      router.push(`/pay/${result.payment.order_id}?method=${encodeURIComponent(selectedPayment)}`)
     } catch (err: unknown) {
       toast.error(getApiErrorMessage(err, t))
       handleTurnstileReset()
@@ -195,7 +177,7 @@ export default function CheckoutPage() {
         {/* Confirm button */}
         <button
           onClick={handleConfirmOrder}
-          disabled={submitting || items.length === 0}
+          disabled={submitting || items.length === 0 || !turnstileReady}
           className="scheme-glow w-full rounded-lg bg-primary py-3.5 text-base font-semibold text-primary-foreground transition-all hover:brightness-110 disabled:pointer-events-none disabled:opacity-50"
         >
           {submitting ? (

@@ -1,5 +1,7 @@
 "use client"
 
+import { safeStorageGet, safeStorageSet, safeStorageRemove } from "@/lib/utils"
+
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from "react"
 import { type Locale, getDictionary, type TranslationKey } from "./i18n"
 import type { UserProfile, CartItem, SiteConfig } from "@/types"
@@ -228,7 +230,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   // 客户端 mount 后立即同步 localStorage 和 DOM 状态
   useEffect(() => {
-    const savedTheme = (localStorage.getItem("theme") as Theme) || "system"
+    const savedTheme = (safeStorageGet("localStorage", "theme") as Theme) || "system"
     const isDark = document.documentElement.classList.contains("dark")
     setThemeState(savedTheme)
     setResolvedTheme(isDark ? "dark" : "light")
@@ -236,7 +238,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
     // 监听系统主题变化
     const mq = window.matchMedia("(prefers-color-scheme: dark)")
     const handler = () => {
-      const currentTheme = localStorage.getItem("theme") || "system"
+      const currentTheme = safeStorageGet("localStorage", "theme") || "system"
       if (currentTheme === "system") {
         const systemIsDark = mq.matches
         setResolvedTheme(systemIsDark ? "dark" : "light")
@@ -249,7 +251,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t)
-    localStorage.setItem("theme", t)
+    safeStorageSet("localStorage", "theme", t)
 
     // 立即同步更新 DOM 和 resolvedTheme
     if (t === "system") {
@@ -267,13 +269,13 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>("coral")
 
   useEffect(() => {
-    const saved = (localStorage.getItem("color-scheme") as ColorScheme) || "coral"
+    const saved = (safeStorageGet("localStorage", "color-scheme") as ColorScheme) || "coral"
     setColorSchemeState(saved)
   }, [])
 
   const setColorScheme = useCallback((c: ColorScheme) => {
     setColorSchemeState(c)
-    localStorage.setItem("color-scheme", c)
+    safeStorageSet("localStorage", "color-scheme", c)
     document.documentElement.setAttribute("data-color", c)
   }, [])
 
@@ -281,13 +283,13 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("zh")
 
   useEffect(() => {
-    const saved = (localStorage.getItem("locale") as Locale) || "zh"
+    const saved = (safeStorageGet("localStorage", "locale") as Locale) || "zh"
     setLocaleState(saved)
   }, [])
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l)
-    localStorage.setItem("locale", l)
+    safeStorageSet("localStorage", "locale", l)
     document.documentElement.setAttribute("lang", l === "en" ? "en" : "zh")
   }, [])
 
@@ -304,7 +306,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const [authLoaded, setAuthLoaded] = useState(false)
 
   useEffect(() => {
-    const saved = localStorage.getItem("userProfile")
+    const saved = safeStorageGet("localStorage", "userProfile")
     if (saved) {
       try {
         setUserState(JSON.parse(saved))
@@ -318,9 +320,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const setUser = useCallback((u: UserProfile | null) => {
     setUserState(u)
     if (u) {
-      localStorage.setItem("userProfile", JSON.stringify(u))
+      safeStorageSet("localStorage", "userProfile", JSON.stringify(u))
     } else {
-      localStorage.removeItem("userProfile")
+      safeStorageRemove("localStorage", "userProfile")
     }
   }, [])
 
@@ -355,8 +357,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   // Fetch cart on mount (if logged in or has session token)
   useEffect(() => {
-    const hasAuth = localStorage.getItem("auth_token")
-    const hasSession = localStorage.getItem("session_token")
+    const hasAuth = safeStorageGet("localStorage", "auth_token")
+    const hasSession = safeStorageGet("localStorage", "session_token")
     if (hasAuth || hasSession) {
       refreshCart()
     }

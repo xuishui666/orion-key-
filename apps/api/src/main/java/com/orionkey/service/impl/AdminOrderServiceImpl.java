@@ -18,6 +18,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -55,6 +57,7 @@ public class AdminOrderServiceImpl implements AdminOrderService {
     @Override
     public Object getOrderDetail(UUID id) {
         Order order = orderRepository.findById(id)
+                .filter(o -> o.getIsDeleted() == 0)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND, "订单不存在"));
         return toAdminOrder(order);
     }
@@ -63,6 +66,7 @@ public class AdminOrderServiceImpl implements AdminOrderService {
     @Transactional
     public void markPaid(UUID id) {
         Order order = orderRepository.findById(id)
+                .filter(o -> o.getIsDeleted() == 0)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND, "订单不存在"));
         if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.EXPIRED) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "仅 PENDING 或 EXPIRED 状态订单可标记为已支付");
@@ -70,6 +74,61 @@ public class AdminOrderServiceImpl implements AdminOrderService {
         order.setStatus(OrderStatus.PAID);
         order.setPaidAt(LocalDateTime.now());
         orderRepository.save(order);
+    }
+
+    @Override
+    @Transactional
+    public void deleteOrder(UUID id) {
+        if (orderRepository.softDeleteByIds(List.of(id)) == 0) {
+            throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, "订单不存在");
+        }
+    }
+
+    @Override
+    @Transactional
+    public int batchDeleteOrders(List<UUID> ids) {
+        if (ids == null || ids.isEmpty()) return 0;
+        if (ids.size() > 500) throw new BusinessException(ErrorCode.BAD_REQUEST, "每次最多删除 500 个订单");
+        return orderRepository.softDeleteByIds(ids);
+    }
+
+    @Override
+    public Object getRevenueStats(String startDate, String endDate) {
+        LocalDateTime start = parseDate(startDate);
+        LocalDateTime end = parseDate(endDate);
+        if (start != null && end != null && start.isAfter(end)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "开始日期不能晚于结束日期");
+        }
+        if (end != null) end = end.plusDays(1);
+        if (start == null) start = LocalDate.of(1970, 1, 1).atStartOfDay();
+        if (end == null) end = LocalDate.of(9999, 1, 1).atStartOfDay();
+
+        Object[] totalRow = orderRepository.summarizeRevenue(start, end).getFirst();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total_amount", totalRow[0] != null ? totalRow[0] : BigDecimal.ZERO);
+        result.put("order_count", totalRow[1] != null ? totalRow[1] : 0L);
+        result.put("by_payment_method", rows(orderRepository.summarizeRevenueByPaymentMethod(start, end), "payment_method"));
+        result.put("by_product", rows(orderRepository.summarizeRevenueByProduct(start, end), "product_title"));
+        return result;
+    }
+
+    private LocalDateTime parseDate(String date) {
+        if (date == null || date.isBlank()) return null;
+        try {
+            return LocalDate.parse(date).atStartOfDay();
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "日期格式应为 YYYY-MM-DD");
+        }
+    }
+
+    private List<Map<String, Object>> rows(List<Object[]> rows, String nameKey) {
+        return rows.stream().map(row -> {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put(nameKey, row[0]);
+            map.put("amount", row[1] != null ? row[1] : BigDecimal.ZERO);
+            map.put("count", row[2] != null ? row[2] : 0L);
+            return map;
+        }).toList();
     }
 
     private Map<String, Object> toAdminOrder(Order o) {

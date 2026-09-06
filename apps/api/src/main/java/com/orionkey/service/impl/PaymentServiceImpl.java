@@ -20,6 +20,8 @@ import com.orionkey.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
@@ -44,6 +46,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final EpayService epayService;
     private final BepusdtService bepusdtService;
     private final ObjectMapper objectMapper;
+    private final PlatformTransactionManager transactionManager;
 
     @Override
     public Map<String, Object> createPayment(UUID orderId, String paymentMethod, BigDecimal amount) {
@@ -59,11 +62,17 @@ public class PaymentServiceImpl implements PaymentService {
 
         // 2. 查找订单
         Order order = orderRepository.findById(orderId)
+                .filter(o -> o.getIsDeleted() == 0)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND, "订单不存在"));
+        if (order.getStatus() != com.orionkey.constant.OrderStatus.PENDING
+                || !order.getExpiresAt().isAfter(java.time.LocalDateTime.now())) {
+            throw new BusinessException(ErrorCode.ORDER_EXPIRED, "订单已结束，不能发起支付");
+        }
 
         // 3. 幂等：已有支付URL直接返回（paymentUrl 或 qrcodeUrl 任一存在即可）
         if ((order.getPaymentUrl() != null && !order.getPaymentUrl().isEmpty())
-                || (order.getQrcodeUrl() != null && !order.getQrcodeUrl().isEmpty())) {
+                || (order.getQrcodeUrl() != null && !order.getQrcodeUrl().isEmpty())
+                || (order.getUsdtWalletAddress() != null && order.getUsdtCryptoAmount() != null)) {
             log.info("Returning cached payment URL for order: {}", orderId);
             return buildResult(order);
         }
@@ -96,7 +105,7 @@ public class PaymentServiceImpl implements PaymentService {
         order.setUsdtCryptoAmount(result.cryptoAmount());
         order.setUsdtTradeId(result.tradeId());
         order.setUsdtChain(channel.getChannelCode());
-        orderRepository.save(order);
+        savePaymentContext(order);
     }
 
     /**
@@ -141,10 +150,10 @@ public class PaymentServiceImpl implements PaymentService {
         );
 
         // 分别存储：payUrl 是 H5 跳转链接，qrcodeUrl 是二维码 URL
-        order.setPaymentUrl(epayResult.payUrl());
+        order.setPaymentUrl(epayResult.payUrl() != null ? epayResult.payUrl() : epayResult.urlScheme());
         order.setQrcodeUrl(epayResult.qrcodeUrl());
         order.setEpayTradeNo(epayResult.tradeNo());
-        orderRepository.save(order);
+        savePaymentContext(order);
     }
 
     /**
@@ -211,9 +220,10 @@ public class PaymentServiceImpl implements PaymentService {
     private static final int REPAY_COOLDOWN_SECONDS = 10;
 
     @Override
-    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public Map<String, Object> repay(UUID orderId, String device, UUID requestUserId) {
         Order order = orderRepository.findById(orderId)
+                .filter(o -> o.getIsDeleted() == 0)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND, "订单不存在"));
 
         // F9: 归属校验 — 已登录用户只能 repay 自己的订单
@@ -239,13 +249,24 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         // 清除旧支付信息，跳过幂等缓存
-        order.setPaymentUrl(null);
-        order.setQrcodeUrl(null);
-        order.setEpayTradeNo(null);
-        orderRepository.save(order);
+        // Reuse an existing payment attempt: clearing it can lose an in-flight USDT payment.
 
         // 重新创建支付
         return createPayment(order.getId(), order.getPaymentMethod(), order.getActualAmount(), device);
+    }
+
+    private void savePaymentContext(Order source) {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            Order current = orderRepository.findByIdForUpdate(source.getId()).orElseThrow();
+            current.setPaymentUrl(source.getPaymentUrl());
+            current.setQrcodeUrl(source.getQrcodeUrl());
+            current.setEpayTradeNo(source.getEpayTradeNo());
+            current.setUsdtWalletAddress(source.getUsdtWalletAddress());
+            current.setUsdtCryptoAmount(source.getUsdtCryptoAmount());
+            current.setUsdtTradeId(source.getUsdtTradeId());
+            current.setUsdtChain(source.getUsdtChain());
+            orderRepository.save(current);
+        });
     }
 
     private static String requireConfig(Map<String, String> cfg, String field, String channelCode) {

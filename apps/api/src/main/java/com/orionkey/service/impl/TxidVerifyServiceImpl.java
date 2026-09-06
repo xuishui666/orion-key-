@@ -81,9 +81,9 @@ public class TxidVerifyServiceImpl implements TxidVerifyService {
 
         // ---- Step 2: 交易是否存在且已确认 ----
         if (tx == null || !tx.confirmed) {
-            saveUnmatched(order, txid, chain, VerifyResult.AUTO_REJECTED,
+            saveUnmatched(order, txid, chain, VerifyResult.PENDING_REVIEW,
                     "TX_NOT_FOUND_OR_UNCONFIRMED", null, null, null);
-            return new VerifyDetail(VerifyResult.AUTO_REJECTED,
+            return new VerifyDetail(VerifyResult.PENDING_REVIEW,
                     "TX_NOT_FOUND_OR_UNCONFIRMED",
                     tx != null ? tx.from : null, tx != null ? tx.to : null,
                     tx != null ? tx.amount : null, false);

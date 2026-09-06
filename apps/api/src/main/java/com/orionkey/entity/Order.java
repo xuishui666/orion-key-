@@ -24,6 +24,9 @@ public class Order extends BaseEntity {
 
     private String email;
 
+    @Column(name = "is_deleted", nullable = false)
+    private int isDeleted = 0;
+
     @Column(precision = 10, scale = 2)
     private BigDecimal totalAmount;
 

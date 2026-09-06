@@ -35,6 +35,7 @@ import type {
   CurrencyItem,
   TxidVerifyResult,
 } from "@/types"
+import { safeStorageGet, safeStorageRemove, safeStorageSet } from "@/lib/utils"
 
 // ============================================================
 // Config
@@ -63,29 +64,29 @@ class ApiError extends Error {
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null
-  return localStorage.getItem("auth_token")
+  return safeStorageGet("localStorage", "auth_token")
 }
 
 export function setToken(token: string) {
-  localStorage.setItem("auth_token", token)
+  if (typeof window === "undefined") return
+  safeStorageSet("localStorage", "auth_token", token)
 }
 
 export function clearToken() {
-  localStorage.removeItem("auth_token")
+  if (typeof window === "undefined") return
+  safeStorageRemove("localStorage", "auth_token")
 }
 
 /**
- * JWT 过期/无效时：清除本地登录态，跳转登录页
- * 使用防抖避免多个并发请求同时触发多次跳转
+ * JWT 过期/无效时：清除本地登录态，跳转登录页 * 使用防抖避免多个并发请求同时触发多次跳转
  */
 let redirecting = false
 function handleUnauthorized() {
   if (typeof window === "undefined" || redirecting) return
   redirecting = true
   clearToken()
-  localStorage.removeItem("userProfile")
+  safeStorageRemove("localStorage", "userProfile")
   const currentPath = window.location.pathname
-  // 已经在登录页则不再跳转
   if (currentPath === "/login") {
     redirecting = false
     return
@@ -99,15 +100,17 @@ function handleUnauthorized() {
 
 function getSessionToken(): string | null {
   if (typeof window === "undefined") return null
-  return localStorage.getItem("session_token")
+  return safeStorageGet("localStorage", "session_token")
 }
 
 function setSessionToken(token: string) {
-  localStorage.setItem("session_token", token)
+  if (typeof window === "undefined") return
+  safeStorageSet("localStorage", "session_token", token)
 }
 
 export function clearSessionToken() {
-  localStorage.removeItem("session_token")
+  if (typeof window === "undefined") return
+  safeStorageRemove("localStorage", "session_token")
 }
 
 // ============================================================
@@ -142,66 +145,46 @@ async function ensureDeviceId(): Promise<string> {
   }
 }
 
-// 启动时异步预热，不阻塞首屏
 if (typeof window !== "undefined") {
   ensureDeviceId()
-}
-
-// ============================================================
-// Turnstile token（模块级别，由页面组件设置）
-// ============================================================
-
-let pendingTurnstileToken: string | null = null
-
-/** 设置 Turnstile token（在调用受保护 API 前由页面组件调用） */
-export function setTurnstileHeaders(token: string) {
-  pendingTurnstileToken = token
-}
-
-/** 消费并清除 Turnstile token（request 内部使用） */
-function consumeTurnstileToken(): string | null {
-  const t = pendingTurnstileToken
-  pendingTurnstileToken = null
-  return t
 }
 
 // ============================================================
 // Core request
 // ============================================================
 
+type ApiRequestOptions = RequestInit & { turnstileToken?: string }
+
 async function request<T>(
   path: string,
-  options: RequestInit = {}
+  options: ApiRequestOptions = {}
 ): Promise<T> {
+  const { turnstileToken, ...fetchOptions } = options
   const token = getToken()
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
+    ...(fetchOptions.headers as Record<string, string>),
   }
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`
   }
-  // 始终发送 session token（购物车等功能需要：JWT 无效/过期时作为身份回退）
   const sessionToken = getSessionToken()
   if (sessionToken) {
     headers["X-Session-Token"] = sessionToken
   }
 
-  // 设备指纹 — 始终发送
   const deviceId = cachedDeviceId || (await ensureDeviceId())
   if (deviceId) {
     headers["X-Device-Id"] = deviceId
   }
 
-  // Turnstile token — 如果有 pending token 则发送（单次消费）
-  const turnstileToken = consumeTurnstileToken()
   if (turnstileToken) {
     headers["X-Turnstile-Token"] = turnstileToken
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
+    ...fetchOptions,
     headers,
   })
 
@@ -274,6 +257,9 @@ export async function withMockFallback<T>(
   try {
     return await apiCall()
   } catch (err) {
+    if (process.env.NODE_ENV !== "development" || process.env.NEXT_PUBLIC_ENABLE_MOCKS !== "true") {
+      throw err
+    }
     if (err instanceof ApiError) {
       throw err // business error — let UI handle it
     }
@@ -291,10 +277,10 @@ export async function withMockFallback<T>(
 export const authApi = {
   getCaptcha: () =>
     request<CaptchaResult>("/auth/captcha"),
-  register: (data: { username: string; password: string; email: string; captcha_id: string; captcha: string }) =>
-    request<AuthResult>("/auth/register", { method: "POST", body: JSON.stringify(data) }),
-  login: (data: { account: string; password: string }) =>
-    request<AuthResult>("/auth/login", { method: "POST", body: JSON.stringify(data) }),
+  register: (data: { username: string; password: string; email: string; captcha_id: string; captcha: string }, turnstileToken?: string) =>
+    request<AuthResult>("/auth/register", { method: "POST", body: JSON.stringify(data), turnstileToken }),
+  login: (data: { account: string; password: string }, turnstileToken?: string) =>
+    request<AuthResult>("/auth/login", { method: "POST", body: JSON.stringify(data), turnstileToken }),
   logout: () =>
     request<null>("/auth/logout", { method: "POST" }),
 }
@@ -353,12 +339,12 @@ export const cartApi = {
 // ============================================================
 
 export const orderApi = {
-  create: (data: CreateOrderRequest) =>
-    request<CreateOrderResult>("/orders", { method: "POST", body: JSON.stringify(data) }),
-  createFromCart: (data: CreateCartOrderRequest) =>
-    request<CreateOrderResult>("/orders/from-cart", { method: "POST", body: JSON.stringify(data) }),
+  create: (data: CreateOrderRequest, turnstileToken?: string) =>
+    request<CreateOrderResult>("/orders", { method: "POST", body: JSON.stringify(data), turnstileToken }),
+  createFromCart: (data: CreateCartOrderRequest, turnstileToken?: string) =>
+    request<CreateOrderResult>("/orders/from-cart", { method: "POST", body: JSON.stringify(data), turnstileToken }),
   getStatus: (orderId: string) =>
-    request<{ order_id: string; status: OrderStatus; expires_at: string; remaining_seconds: number; payment_url?: string }>(`/orders/${orderId}/status`),
+    request<{ order_id: string; status: OrderStatus; expires_at: string; remaining_seconds: number; payment_url?: string; qrcode_url?: string; payment_method?: string; pay_url?: string; wallet_address?: string; crypto_amount?: string; chain?: string }>(`/orders/${orderId}/status`),
   refreshStatus: (orderId: string) =>
     request<{ status: OrderStatus }>(`/orders/${orderId}/refresh`, { method: "POST" }),
   query: (data: { order_ids?: string[]; emails?: string[] }) =>
@@ -502,6 +488,10 @@ export const adminCardKeyApi = {
   },
   invalidate: (id: string) =>
     request<null>(`/admin/card-keys/${id}/invalidate`, { method: "POST" }),
+  delete: (id: string) =>
+    request<null>(`/admin/card-keys/${id}`, { method: "DELETE" }),
+  batchDelete: (ids: string[]) =>
+    request<{ deleted_count: number }>("/admin/card-keys/batch-delete", { method: "POST", body: JSON.stringify({ ids }) }),
   batchInvalidate: (params: { product_id: string; spec_id?: string | null }) => {
     const qs = buildQuery(params)
     return request<{ invalidated_count: number }>(`/admin/card-keys/batch-invalidate?${qs}`, { method: "POST" })
@@ -526,6 +516,14 @@ export const adminOrderApi = {
     request<AdminOrderItem>(`/admin/orders/${id}`),
   markPaid: (id: string) =>
     request<null>(`/admin/orders/${id}/mark-paid`, { method: "POST" }),
+  delete: (id: string) =>
+    request<null>(`/admin/orders/${id}`, { method: "DELETE" }),
+  batchDelete: (ids: string[]) =>
+    request<{ deleted_count: number }>("/admin/orders/batch-delete", { method: "POST", body: JSON.stringify({ ids }) }),
+  getRevenueStats: (params: { start_date?: string; end_date?: string }) => {
+    const qs = buildQuery(params)
+    return request<{ total_amount: number; order_count: number; by_payment_method: { payment_method: string; amount: number; count: number }[]; by_product: { product_title: string; amount: number; count: number }[] }>(`/admin/orders/revenue-stats?${qs}`)
+  },
 }
 
 // ============================================================
@@ -619,7 +617,6 @@ export { ApiError }
 // Error code → i18n key mapping
 // ============================================================
 
-// 只映射用户可见的前台错误码，后台管理页面不映射（后台统一中文界面）
 const ERROR_CODE_I18N: Record<number, string> = {
   // 通用
   10002: "error.unauthorized",
@@ -659,27 +656,23 @@ const ERROR_CODE_I18N: Record<number, string> = {
 }
 
 /**
- * 从 API 错误中提取用户可见的提示文案。
- * 已映射 → i18n 文案 + 参数插值
- * 未映射 → 后端原始 message（兜底，不丢信息）
- * 非 ApiError → 原始 error message
+ * 从 API 错误中提取用户可见的提示文案。 * 已映射 → i18n 文案 + 参数插值 * 未映射 → 后端原始 message（兜底，不丢信息） * 非 ApiError → 原始 error message
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getApiErrorMessage(err: unknown, t: (key: any) => string): string {
+  const fallback = t("common.error")?.trim() || "操作失败，请稍后重试"
   if (err instanceof ApiError) {
     const i18nKey = ERROR_CODE_I18N[err.code]
     if (i18nKey) {
       let msg = t(i18nKey)
-      // 参数插值: {available} → 实际值
       if (err.params) {
         for (const [k, v] of Object.entries(err.params)) {
           msg = msg.replace(`{${k}}`, String(v))
         }
       }
-      return msg
+      return msg?.trim() || fallback
     }
-    // 未映射的 code → 直接返回后端原始 message（兜底，不丢信息）
-    return err.message
+    return err.message?.trim() || fallback
   }
-  return err instanceof Error ? err.message : t("common.error")
+  return err instanceof Error ? (err.message?.trim() || fallback) : fallback
 }

@@ -13,7 +13,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -35,10 +39,18 @@ public class OrderServiceImpl implements OrderService {
     private final SiteConfigRepository siteConfigRepository;
     private final PaymentChannelRepository paymentChannelRepository;
     private final PaymentService paymentService;
+    private final PlatformTransactionManager transactionManager;
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Map<String, Object> createDirectOrder(Map<String, Object> req, UUID userId, String clientIp, String sessionToken) {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        Order order = transaction.execute(status -> persistDirectOrder(req, userId, clientIp, sessionToken));
+        return buildOrderResult(Objects.requireNonNull(order), (String) req.get("device"));
+    }
+
+    private Order persistDirectOrder(Map<String, Object> req, UUID userId, String clientIp, String sessionToken) {
         String device = (String) req.get("device");
         String idempotencyKey = (String) req.get("idempotency_key");
         if (idempotencyKey != null) {
@@ -50,7 +62,7 @@ public class OrderServiceImpl implements OrderService {
                         || (userId == null && existingOrder.getUserId() == null
                             && Objects.equals(sessionToken, existingOrder.getSessionToken()));
                 if (sameOwner) {
-                    return buildOrderResult(existingOrder, device);
+                    return existingOrder;
                 }
                 // 不同用户/会话的相同幂等键 — 清除以避免唯一约束冲突，视为无幂等键的新订单
                 idempotencyKey = null;
@@ -128,12 +140,19 @@ public class OrderServiceImpl implements OrderService {
         item.setSubtotal(totalAmount);
         orderItemRepository.save(item);
 
-        return buildOrderResult(order, device);
+        return order;
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Map<String, Object> createCartOrder(Map<String, Object> req, UUID userId, String clientIp, String sessionToken) {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        Order order = transaction.execute(status -> persistCartOrder(req, userId, clientIp, sessionToken));
+        return buildOrderResult(Objects.requireNonNull(order), (String) req.get("device"));
+    }
+
+    private Order persistCartOrder(Map<String, Object> req, UUID userId, String clientIp, String sessionToken) {
         String device = (String) req.get("device");
         String idempotencyKey = (String) req.get("idempotency_key");
         if (idempotencyKey != null) {
@@ -144,7 +163,7 @@ public class OrderServiceImpl implements OrderService {
                         || (userId == null && existingOrder.getUserId() == null
                             && Objects.equals(sessionToken, existingOrder.getSessionToken()));
                 if (sameOwner) {
-                    return buildOrderResult(existingOrder, device);
+                    return existingOrder;
                 }
                 // 不同用户/会话的相同幂等键 — 清除以避免唯一约束冲突，视为无幂等键的新订单
                 idempotencyKey = null;
@@ -252,13 +271,14 @@ public class OrderServiceImpl implements OrderService {
             cartItemRepository.delete(ci);
         }
 
-        return buildOrderResult(order, device);
+        return order;
     }
 
     @Override
     @Transactional
     public Map<String, Object> getOrderStatus(UUID orderId) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .filter(o -> o.getIsDeleted() == 0)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND, "订单不存在"));
         // Auto expire check
         if (order.getStatus() == OrderStatus.PENDING && order.getExpiresAt().isBefore(LocalDateTime.now())) {
@@ -267,6 +287,7 @@ public class OrderServiceImpl implements OrderService {
         }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("order_id", order.getId());
+        result.put("payment_method", order.getPaymentMethod());
         result.put("status", order.getStatus().name());
         result.put("expires_at", order.getExpiresAt());
         // 返回服务端计算的剩余秒数，前端倒计时以此为准，不受客户端时钟影响
@@ -281,6 +302,13 @@ public class OrderServiceImpl implements OrderService {
             String effectiveUrl = order.getQrcodeUrl() != null ? order.getQrcodeUrl() : order.getPaymentUrl();
             if (effectiveUrl != null) {
                 result.put("payment_url", effectiveUrl);
+            }
+            result.put("qrcode_url", order.getQrcodeUrl());
+            result.put("pay_url", order.getPaymentUrl());
+            if (order.getUsdtWalletAddress() != null) {
+                result.put("wallet_address", order.getUsdtWalletAddress());
+                result.put("crypto_amount", order.getUsdtCryptoAmount());
+                result.put("chain", order.getUsdtChain());
             }
         }
         return result;
@@ -359,8 +387,17 @@ public class OrderServiceImpl implements OrderService {
     private Map<String, Object> buildOrderResult(Order order, String device) {
         List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
         Map<String, Object> orderDetail = toOrderDetail(order, items);
-        Map<String, Object> payment = paymentService.createPayment(
-                order.getId(), order.getPaymentMethod(), order.getActualAmount(), device);
+        Map<String, Object> payment;
+        try {
+            payment = paymentService.createPayment(
+                    order.getId(), order.getPaymentMethod(), order.getActualAmount(), device);
+        } catch (BusinessException e) {
+            log.warn("Payment initialization failed for committed order {}", order.getId());
+            payment = new LinkedHashMap<>();
+            payment.put("order_id", order.getId());
+            payment.put("expires_at", order.getExpiresAt());
+            payment.put("error", e.getMessage());
+        }
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("order", orderDetail);

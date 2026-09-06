@@ -96,7 +96,6 @@ public class WebhookServiceImpl implements WebhookService {
         if (order == null) {
             event.setProcessResult("ORDER_NOT_FOUND");
             log.warn("Epay callback order not found: {}", orderId);
-            webhookEventRepository.save(event);
             return "SUCCESS";
         }
 
@@ -104,7 +103,6 @@ public class WebhookServiceImpl implements WebhookService {
         if (money == null || money.isBlank()) {
             log.error("Epay callback missing money parameter: out_trade_no={}", outTradeNo);
             event.setProcessResult("MISSING_AMOUNT");
-            webhookEventRepository.save(event);
             return "FAIL";
         }
         BigDecimal callbackAmount;
@@ -113,13 +111,11 @@ public class WebhookServiceImpl implements WebhookService {
         } catch (NumberFormatException e) {
             log.error("Epay callback invalid money format: {}, out_trade_no={}", money, outTradeNo);
             event.setProcessResult("INVALID_AMOUNT_FORMAT");
-            webhookEventRepository.save(event);
             return "FAIL";
         }
         if (order.getActualAmount().compareTo(callbackAmount) != 0) {
             log.error("Epay callback amount mismatch: order={}, callback={}", order.getActualAmount(), callbackAmount);
             event.setProcessResult("AMOUNT_MISMATCH");
-            webhookEventRepository.save(event);
             return "FAIL";
         }
 
@@ -137,7 +133,6 @@ public class WebhookServiceImpl implements WebhookService {
                 log.error("Epay callback rejected: query status={}, expected TRADE_SUCCESS/1, out_trade_no={}",
                         queryResult.tradeStatus(), outTradeNo);
                 event.setProcessResult("QUERY_STATUS_MISMATCH");
-                webhookEventRepository.save(event);
                 return "FAIL";
             }
             // 校验网关返回的金额与订单金额一致
@@ -148,7 +143,6 @@ public class WebhookServiceImpl implements WebhookService {
                         log.error("Epay callback rejected: query amount={}, order amount={}, out_trade_no={}",
                                 queryAmount, order.getActualAmount(), outTradeNo);
                         event.setProcessResult("QUERY_AMOUNT_MISMATCH");
-                        webhookEventRepository.save(event);
                         return "FAIL";
                     }
                 } catch (NumberFormatException e) {
@@ -288,8 +282,7 @@ public class WebhookServiceImpl implements WebhookService {
             // 链上验证失败（交易不存在/未确认/地址不匹配/非USDT/金额不匹配）— 写入幂等表拒绝
             log.error("BEpusdt callback rejected by on-chain verification: {}, trade_id={}, txid={}",
                     chainResult.reason(), tradeId, blockTxId);
-            saveWebhookEvent(eventId, "usdt", order.getId(), signParams.toString(),
-                    "ONCHAIN_VERIFY_FAILED: " + chainResult.reason());
+            // Do not consume the event: a transaction may still be awaiting confirmations.
             return "ok";
         }
         log.info("BEpusdt callback on-chain verification passed: trade_id={}, txid={}", tradeId, blockTxId);

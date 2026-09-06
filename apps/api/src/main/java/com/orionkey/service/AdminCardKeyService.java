@@ -16,6 +16,10 @@ public interface AdminCardKeyService {
 
     void invalidateCardKey(UUID id);
 
+    void deleteCardKey(UUID id);
+
+    int batchDeleteCardKeys(List<UUID> ids);
+
     int batchInvalidateCardKeys(UUID productId, UUID specId);
 
     List<?> getCardKeysByOrder(UUID orderId);

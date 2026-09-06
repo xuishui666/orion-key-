@@ -65,10 +65,10 @@ public class UserServiceImpl implements UserService {
             } catch (IllegalArgumentException e) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "无效的订单状态: " + status);
             }
-            orderPage = orderRepository.findByUserIdAndStatusOrderByCreatedAtDesc(
-                    userId, os, pageable);
+            orderPage = orderRepository.findByUserIdAndStatusAndIsDeletedOrderByCreatedAtDesc(
+                    userId, os, 0, pageable);
         } else {
-            orderPage = orderRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+            orderPage = orderRepository.findByUserIdAndIsDeletedOrderByCreatedAtDesc(userId, 0, pageable);
         }
 
         // 主动过期检查：PENDING 且已超时的订单标记为 EXPIRED（与 queryOrders 逻辑一致）

@@ -21,9 +21,9 @@ import {
 import { QRCodeSVG } from "qrcode.react"
 import { toast } from "sonner"
 import { useLocale, useCart, useSiteConfig } from "@/lib/context"
-import { orderApi } from "@/services/api"
+import { getApiErrorMessage, orderApi } from "@/services/api"
 import type { OrderStatus } from "@/types"
-import { cn, detectPaymentDevice, isMobileDevice } from "@/lib/utils"
+import { safePaymentUrl, cn, detectPaymentDevice, isMobileDevice, safeStorageGet, safeStorageRemove, safeStorageSet } from "@/lib/utils"
 import { PaymentIcon, getPaymentLabel, getPaymentBrandColor, getPaymentScanHint } from "@/components/shared/payment-icon"
 
 const POLL_INTERVAL = 3000 // 3 seconds
@@ -50,73 +50,70 @@ export default function PaymentPage({ params }: { params: Promise<{ orderId: str
 
   const isMobile = isMobileDevice()
 
-  const paymentMethod = searchParams.get("method") || "alipay"
+  const [paymentMethod, setPaymentMethod] = useState(searchParams.get("method") || "alipay")
   const paymentMethodName = getPaymentLabel(paymentMethod, t)
   const scanHint = getPaymentScanHint(paymentMethod, t)
   const brandColor = getPaymentBrandColor(paymentMethod)
 
   // USDT 支付判断 & 参数
   const isUsdtPayment = paymentMethod.startsWith("usdt_")
-  // 微信移动端：jspay 走 JSAPI（需微信内置浏览器），普通浏览器只能展示二维码
   const isWechatMobile = isMobile && ["wechat", "wxpay"].includes(paymentMethod.toLowerCase())
-  const walletAddress = searchParams.get("wallet") || ""
-  const cryptoAmount = searchParams.get("crypto_amount") || ""
-  const usdtChain = searchParams.get("chain") || paymentMethod
+  const [walletAddress, setWalletAddress] = useState("")
+  const [cryptoAmount, setCryptoAmount] = useState("")
+  const [usdtChain, setUsdtChain] = useState(paymentMethod)
   const chainDisplayName = usdtChain.includes("trc20") ? "TRC-20" : usdtChain.includes("bep20") ? "BEP-20" : usdtChain
 
-  // 初始化：获取订单状态 + QR code + H5 pay URL + 真实倒计时
+  const applyOrderStatus = useCallback((result: Awaited<ReturnType<typeof orderApi.getStatus>>, preferExistingUrls = false) => {
+    if (result.payment_method) setPaymentMethod(result.payment_method)
+    if (result.remaining_seconds !== undefined) setTimeLeft(result.remaining_seconds)
+    setQrcodeUrl((prev) => (preferExistingUrls && prev ? prev : result.qrcode_url || result.payment_url || prev))
+    setPayUrlH5(safePaymentUrl(result.pay_url))
+    if (result.wallet_address) setWalletAddress(result.wallet_address)
+    if (result.crypto_amount) setCryptoAmount(result.crypto_amount)
+    if (result.chain) setUsdtChain(result.chain)
+    if (result.status !== "PENDING") setStatus(result.status)
+  }, [])
+
   useEffect(() => {
-    const qrFromParam = searchParams.get("qr")
+    const qrFromParam = ""
     if (qrFromParam) {
       setQrcodeUrl(qrFromParam)
     }
 
-    const payurlFromParam = searchParams.get("payurl")
+    const payurlFromParam = ""
     if (payurlFromParam) {
       setPayUrlH5(payurlFromParam)
     }
 
     // 检查是否已跳转过支付 App（从 sessionStorage 恢复状态）
-    if (sessionStorage.getItem(`pay_redirected_${orderId}`)) {
+    if (safeStorageGet("sessionStorage", `pay_redirected_${orderId}`)) {
       setHasRedirected(true)
     }
 
-    // 从 API 获取服务端计算的 remaining_seconds，不依赖客户端时钟
     async function fetchOrderInfo() {
       try {
         const result = await orderApi.getStatus(orderId)
-        if (result.remaining_seconds !== undefined) {
-          setTimeLeft(result.remaining_seconds)
-        }
-        if (!qrFromParam && result.payment_url) {
-          setQrcodeUrl(result.payment_url)
-        }
-        if (result.status !== "PENDING") {
-          setStatus(result.status)
-        }
+        applyOrderStatus(result, !!qrFromParam || !!payurlFromParam)
       } catch {
-        // silent — 首次下单可能刚创建，保持默认倒计时
       }
     }
     fetchOrderInfo()
-  }, [orderId, searchParams])
+  }, [orderId, searchParams, applyOrderStatus])
 
   // H5 自动跳转（移动端 + 有 payUrl + PENDING 状态 + 未跳转过 + 非微信）
-  // 微信 jspay 走 JSAPI（需微信浏览器），普通浏览器不能 H5 跳转，只能扫码
   useEffect(() => {
-    if (!isMobile || !payUrlH5 || status !== "PENDING" || isUsdtPayment || isWechatMobile) return
+    if (hasRedirected || !isMobile || !/^https?:[/][/]/i.test(payUrlH5) || status !== "PENDING" || isUsdtPayment || isWechatMobile) return
     const storageKey = `pay_redirected_${orderId}`
-    if (sessionStorage.getItem(storageKey)) {
+    if (safeStorageGet("sessionStorage", storageKey)) {
       setHasRedirected(true)
       return
     }
-    sessionStorage.setItem(storageKey, "1")
+    safeStorageSet("sessionStorage", storageKey, "1")
     setHasRedirected(true)
     window.location.href = payUrlH5
-  }, [isMobile, payUrlH5, status, orderId, isUsdtPayment, isWechatMobile])
+  }, [isMobile, payUrlH5, status, orderId, isUsdtPayment, isWechatMobile, hasRedirected])
 
   // Countdown timer — 仅在服务端返回真实倒计时后才开始递减
-  // 倒计时归零时仅停止递减，不单方面设置 EXPIRED — 等待下一次轮询从服务端获取真实状态
   useEffect(() => {
     if (status !== "PENDING" || timeLeft < 0) return
     const timer = setInterval(() => {
@@ -126,28 +123,22 @@ export default function PaymentPage({ params }: { params: Promise<{ orderId: str
   }, [status, timeLeft < 0])
 
   // Auto polling for payment status
-  // 网络错误时静默跳过（不更新任何状态），等待下次轮询；避免 mock 数据污染倒计时
   useEffect(() => {
     if (status !== "PENDING") return
     const poll = setInterval(async () => {
       try {
         const result = await orderApi.getStatus(orderId)
-        // 同步服务端倒计时，防止客户端时间漂移
-        if (result.remaining_seconds !== undefined) {
-          setTimeLeft(result.remaining_seconds)
-        }
+        applyOrderStatus(result, true)
         if (result.status !== "PENDING") {
-          setStatus(result.status)
           if (result.status === "PAID" || result.status === "DELIVERED") {
             refreshCart()
           }
         }
       } catch {
-        // silent — 网络抖动时继续轮询，不更新状态
       }
     }, POLL_INTERVAL)
     return () => clearInterval(poll)
-  }, [status, orderId, refreshCart])
+  }, [status, orderId, refreshCart, applyOrderStatus])
 
   // Manual refresh cooldown
   useEffect(() => {
@@ -163,8 +154,8 @@ export default function PaymentPage({ params }: { params: Promise<{ orderId: str
     setIsRefreshing(true)
     try {
       const result = await orderApi.getStatus(orderId)
+      applyOrderStatus(result, true)
       if (result.status !== "PENDING") {
-        setStatus(result.status)
         if (result.status === "PAID" || result.status === "DELIVERED") {
           refreshCart()
         }
@@ -176,9 +167,8 @@ export default function PaymentPage({ params }: { params: Promise<{ orderId: str
       setRefreshCooldown(MANUAL_REFRESH_COOLDOWN)
       toast.info(t("payment.statusRefreshed"))
     }
-  }, [refreshCooldown, isRefreshing, orderId, t])
+  }, [refreshCooldown, isRefreshing, orderId, t, refreshCart, applyOrderStatus])
 
-  // 重新发起支付（移动端重试）
   const handleRetryPayment = useCallback(async () => {
     if (retrying) return
     setRetrying(true)
@@ -186,24 +176,26 @@ export default function PaymentPage({ params }: { params: Promise<{ orderId: str
       const device = detectPaymentDevice()
       const result = await orderApi.repay(orderId, device)
       // 更新支付链接
-      if (result.pay_url) setPayUrlH5(result.pay_url)
+      if (result.pay_url) setPayUrlH5(safePaymentUrl(result.pay_url))
       if (result.qrcode_url) setQrcodeUrl(result.qrcode_url)
       else if (result.payment_url) setQrcodeUrl(result.payment_url)
+      if (result.wallet_address) setWalletAddress(result.wallet_address)
+      if (result.crypto_amount) setCryptoAmount(result.crypto_amount)
+      if (result.chain) setUsdtChain(result.chain)
 
-      if (isMobile && result.pay_url && !isWechatMobile) {
+      if (isMobile && result.pay_url && /^https?:[/][/]/i.test(result.pay_url) && !isWechatMobile && !isUsdtPayment) {
         // 清除跳转标记，允许重新跳转（微信走 JSAPI 不能跳转，只刷新二维码）
-        sessionStorage.removeItem(`pay_redirected_${orderId}`)
+        safeStorageRemove("sessionStorage", `pay_redirected_${orderId}`)
         window.location.href = result.pay_url
       } else {
         toast.success(t("payment.statusRefreshed"))
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : t("common.error")
-      toast.error(msg)
+      toast.error(getApiErrorMessage(err, t))
     } finally {
       setRetrying(false)
     }
-  }, [retrying, orderId, isMobile, t])
+  }, [retrying, orderId, isMobile, isWechatMobile, isUsdtPayment, t])
 
   const copyToClipboard = useCallback((text: string) => {
     if (navigator.clipboard?.writeText) {
@@ -307,6 +299,7 @@ export default function PaymentPage({ params }: { params: Promise<{ orderId: str
           </span>
         </div>
 
+        {!isUsdtPayment && payUrlH5 && <a href={payUrlH5} className="mb-4 inline-flex items-center gap-2 rounded border px-4 py-2"><ExternalLink className="h-4 w-4" />打开支付</a>}
         {isUsdtPayment ? (
           /* ========== USDT 支付视图（紧凑居中布局） ========== */
           <div className="flex w-full flex-col items-center gap-3">
@@ -320,7 +313,9 @@ export default function PaymentPage({ params }: { params: Promise<{ orderId: str
             <div className="flex w-full max-w-sm flex-col rounded-xl border border-border/60 bg-card shadow-sm transition-all duration-200 hover:border-border hover:shadow-md">
               {/* 转账金额 */}
               <div className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-                <span className="text-sm text-muted-foreground">{t("payment.usdt.amount")}（{t("payment.usdt.amountHint")}）</span>
+                <span className="text-sm text-muted-foreground">
+                  {t("payment.usdt.amount")}（{t("payment.usdt.amountHint")}）
+                </span>
                 <span className="flex items-center gap-2">
                   <span
                     className="cursor-pointer text-lg font-bold text-foreground underline-offset-4 transition-all hover:underline hover:text-primary"
@@ -380,15 +375,15 @@ export default function PaymentPage({ params }: { params: Promise<{ orderId: str
             {/* ⑤ 警告提示 — 紧凑 */}
             <ul className="flex w-full max-w-sm flex-col gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
               <li className="flex items-start gap-1.5">
-                <span className="mt-0.5 shrink-0">•</span>
+                <span className="mt-0.5 shrink-0">-</span>
                 <span>{t("payment.usdt.warnExact").replace("{amount}", cryptoAmount)}</span>
               </li>
               <li className="flex items-start gap-1.5">
-                <span className="mt-0.5 shrink-0">•</span>
+                <span className="mt-0.5 shrink-0">-</span>
                 <span>{t("payment.usdt.warnChain").replace("{chain}", chainDisplayName)}</span>
               </li>
               <li className="flex items-start gap-1.5">
-                <span className="mt-0.5 shrink-0">•</span>
+                <span className="mt-0.5 shrink-0">-</span>
                 <span>{t("payment.usdt.delayHint")}</span>
               </li>
             </ul>

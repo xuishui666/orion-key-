@@ -6,9 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff, LogIn } from "lucide-react"
 import { toast } from "sonner"
 import { useLocale, useAuth, useCart } from "@/lib/context"
-import { setToken, authApi, withMockFallback, getApiErrorMessage, setTurnstileHeaders } from "@/services/api"
+import { setToken, authApi, withMockFallback, getApiErrorMessage } from "@/services/api"
 import { mockLogin } from "@/lib/mock-data"
 import { Turnstile, useTurnstile } from "@/components/shared/turnstile"
+import { safeStorageRemove, safeStorageSet } from "@/lib/utils"
 
 export default function LoginPage() {
   const { t } = useLocale()
@@ -23,17 +24,20 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const { turnstileToken, setTurnstileToken, handleTurnstileReset } = useTurnstile()
+  const { turnstileToken, setTurnstileToken, turnstileReady, handleTurnstileReset } = useTurnstile()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!account.trim() || !password.trim()) return
+    if (!turnstileReady) {
+      toast.error("人机验证未完成，请稍后重试")
+      return
+    }
 
     setIsLoading(true)
     try {
-      setTurnstileHeaders(turnstileToken)
       const result = await withMockFallback(
-        () => authApi.login({ account: account.trim(), password }),
+        () => authApi.login({ account: account.trim(), password }, turnstileToken),
         () => mockLogin()
       )
 
@@ -41,9 +45,9 @@ export default function LoginPage() {
       setUser(result.user)
 
       if (rememberMe) {
-        localStorage.setItem("rememberMe", "true")
+        safeStorageSet("localStorage", "rememberMe", "true")
       } else {
-        localStorage.removeItem("rememberMe")
+        safeStorageRemove("localStorage", "rememberMe")
       }
 
       // Refresh cart after login (merges session cart)
@@ -141,7 +145,7 @@ export default function LoginPage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !turnstileReady}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
             >
               {isLoading ? (

@@ -42,7 +42,7 @@ public interface EpayService {
      */
     OrderQueryResult queryOrder(ChannelConfig config, String outTradeNo);
 
-    record EpayResult(int code, String msg, String tradeNo, String payUrl, String qrcodeUrl) {}
+    record EpayResult(int code, String msg, String tradeNo, String payUrl, String qrcodeUrl, String urlScheme) {}
 
     record OrderQueryResult(String tradeStatus, String money, String tradeNo) {}
 }

@@ -87,8 +87,7 @@ public class OrderController {
     }
 
     /**
-     * 用户提交 TXID 进行自动链上验证（USDT 补单）
-     */
+     * 用户提交 TXID 进行自动链上验证（USDT 补单）     */
     @PostMapping("/{id}/txid-verify")
     public ApiResponse<?> submitTxidForVerification(@PathVariable UUID id,
                                                      @RequestBody Map<String, String> request) {
@@ -100,6 +99,7 @@ public class OrderController {
 
         // 1. 校验订单存在
         Order order = orderRepository.findById(id)
+                .filter(o -> o.getIsDeleted() == 0)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND, "订单不存在"));
 
         // 2. 校验订单状态为 PENDING 或 EXPIRED
@@ -115,7 +115,6 @@ public class OrderController {
         // 4. 校验 TXID 格式
         validateTxidFormat(txid, order.getUsdtChain());
 
-        // 5. 校验 TXID 未被其他订单使用（同时检查 unmatched_transactions 表和 orders.usdt_tx_id 字段）
         if (unmatchedTransactionRepository.findByTxid(txid).isPresent()) {
             throw new BusinessException(ErrorCode.TXID_ALREADY_USED, "该交易哈希已被提交过");
         }

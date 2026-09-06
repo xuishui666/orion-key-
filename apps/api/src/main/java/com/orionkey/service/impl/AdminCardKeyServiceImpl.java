@@ -176,6 +176,21 @@ public class AdminCardKeyServiceImpl implements AdminCardKeyService {
 
     @Override
     @Transactional
+    public void deleteCardKey(UUID id) {
+        if (cardKeyRepository.softDeleteByIdIfUnsold(id) == 0) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "卡密不存在或已售出，不能删除");
+        }
+    }
+
+    @Override
+    @Transactional
+    public int batchDeleteCardKeys(List<UUID> ids) {
+        if (ids == null || ids.isEmpty()) return 0;
+        return cardKeyRepository.softDeleteByIdsIfUnsold(ids);
+    }
+
+    @Override
+    @Transactional
     public int batchInvalidateCardKeys(UUID productId, UUID specId) {
         return cardKeyRepository.updateStatusByProductIdAndSpecId(
                 productId, specId, CardKeyStatus.AVAILABLE, CardKeyStatus.INVALID);

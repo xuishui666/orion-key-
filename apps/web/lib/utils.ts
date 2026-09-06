@@ -56,12 +56,55 @@ export function detectPaymentDevice(): string {
   const ua = navigator.userAgent.toLowerCase()
   if (ua.includes('micromessenger')) return 'wechat'
   if (ua.includes('alipayclient') || ua.includes('alipay')) return 'alipay'
-  if (/android|iphone|ipad|ipod|mobile/i.test(ua)) return 'mobile'
+  if (/iphone|ipad|ipod/i.test(ua)) {
+    return /safari/i.test(ua) && !/crios|fxios|edgios/i.test(ua) ? 'ios_safari' : 'ios_webview'
+  }
+  if (/android/i.test(ua)) {
+    return /; wv\)|version\/\d/i.test(ua) ? 'android_webview' : 'android'
+  }
+  if (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return 'ios_safari'
+  if (/mobile/i.test(ua)) return 'mobile'
   return 'pc'
 }
 
 export function isMobileDevice(): boolean {
   return detectPaymentDevice() !== 'pc'
+}
+
+export function safePaymentUrl(value?: string | null): string {
+  if (!value) return ""
+  try {
+    const url = new URL(value)
+    return ["https:", "http:", "alipays:", "alipay:", "weixin:"].includes(url.protocol) ? value : ""
+  } catch { return "" }
+}
+
+const storageFallback = new Map<string, string>()
+
+export function safeStorageGet(storage: "localStorage" | "sessionStorage", key: string): string | null {
+  try {
+    return window[storage].getItem(key)
+  } catch {
+    return storageFallback.get(storage + ":" + key) ?? null
+  }
+}
+
+export function safeStorageSet(storage: "localStorage" | "sessionStorage", key: string, value: string) {
+  storageFallback.set(storage + ":" + key, value)
+  try {
+    window[storage].setItem(key, value)
+  } catch {
+    // Storage may be blocked in Safari private mode or embedded WebViews.
+  }
+}
+
+export function safeStorageRemove(storage: "localStorage" | "sessionStorage", key: string) {
+  storageFallback.delete(storage + ":" + key)
+  try {
+    window[storage].removeItem(key)
+  } catch {
+    // ignore
+  }
 }
 
 /** Strip invisible Unicode control characters (direction marks, zero-width chars, BOM) */

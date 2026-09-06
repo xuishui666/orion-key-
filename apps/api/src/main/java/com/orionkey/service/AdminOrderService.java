@@ -12,4 +12,10 @@ public interface AdminOrderService {
     Object getOrderDetail(UUID id);
 
     void markPaid(UUID id);
+
+    void deleteOrder(UUID id);
+
+    int batchDeleteOrders(java.util.List<UUID> ids);
+
+    Object getRevenueStats(String startDate, String endDate);
 }

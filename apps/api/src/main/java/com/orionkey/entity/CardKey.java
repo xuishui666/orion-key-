@@ -37,4 +37,7 @@ public class CardKey extends BaseEntity {
     private UUID importBatchId;
 
     private LocalDateTime soldAt;
+
+    @Column(name = "is_deleted", nullable = false)
+    private int isDeleted = 0;
 }

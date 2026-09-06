@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Eye, EyeOff, UserPlus, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { useLocale } from "@/lib/context"
-import { authApi, withMockFallback, getApiErrorMessage, setTurnstileHeaders } from "@/services/api"
+import { authApi, withMockFallback, getApiErrorMessage } from "@/services/api"
 import { mockCaptcha } from "@/lib/mock-data"
 import { Turnstile, useTurnstile } from "@/components/shared/turnstile"
 
@@ -25,7 +25,7 @@ export default function RegisterPage() {
   const [captchaId, setCaptchaId] = useState("")
   const [captchaImage, setCaptchaImage] = useState("")
   const [captchaLoading, setCaptchaLoading] = useState(false)
-  const { turnstileToken, setTurnstileToken, handleTurnstileReset } = useTurnstile()
+  const { turnstileToken, setTurnstileToken, turnstileReady, handleTurnstileReset } = useTurnstile()
 
   const fetchCaptcha = useCallback(async () => {
     setCaptchaLoading(true)
@@ -60,10 +60,13 @@ export default function RegisterPage() {
     if (!form.username.trim() || !form.email.trim() || !form.password.trim() || !form.captcha.trim()) {
       return
     }
+    if (!turnstileReady) {
+      toast.error("人机验证未完成，请稍后重试")
+      return
+    }
 
     setIsLoading(true)
     try {
-      setTurnstileHeaders(turnstileToken)
       await withMockFallback(
         () => authApi.register({
           username: form.username.trim(),
@@ -71,7 +74,7 @@ export default function RegisterPage() {
           email: form.email.trim(),
           captcha_id: captchaId,
           captcha: form.captcha.trim(),
-        }),
+        }, turnstileToken),
         () => {
           const { mockRegister } = require("@/lib/mock-data")
           return mockRegister()
@@ -199,7 +202,7 @@ export default function RegisterPage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !turnstileReady}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
             >
               {isLoading ? (
