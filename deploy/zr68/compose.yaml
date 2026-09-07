@@ -1,0 +1,70 @@
+name: orion-zr68
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: orion_zr68
+      POSTGRES_USER: orion_zr68
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?required}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    command: [postgres, -c, shared_buffers=16MB, -c, max_connections=20]
+    mem_limit: 128m
+    memswap_limit: 128m
+    cpus: 0.20
+    restart: "no"
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U orion_zr68 -d orion_zr68"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "2"
+  api:
+    image: ghcr.io/xuishui666/orion-key-api:4b1262b
+    ports: ["127.0.0.1:18083:8083"]
+    environment:
+      TZ: Asia/Shanghai
+      DB_URL: jdbc:postgresql://db:5432/orion_zr68
+      DB_USERNAME: orion_zr68
+      DB_PASSWORD: ${DB_PASSWORD:?required}
+      JWT_SECRET: ${JWT_SECRET:?required}
+      PASSWORD_PLAIN: "false"
+      MAIL_ENABLED: "false"
+      MAIL_SITE_URL: https://zr68.manxi.cc
+      JAVA_TOOL_OPTIONS: -Xms64m -Xmx192m -XX:+UseSerialGC -XX:ActiveProcessorCount=1 -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=32m -Xss512k
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "5"
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: "1"
+      SERVER_TOMCAT_THREADS_MAX: "20"
+      SERVER_TOMCAT_THREADS_MIN_SPARE: "2"
+      LOGGING_LEVEL_COM_ORIONKEY: INFO
+    volumes:
+      - uploads:/app/uploads
+    mem_limit: 384m
+    memswap_limit: 384m
+    cpus: 0.40
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *logging
+  web:
+    image: ghcr.io/xuishui666/orion-key-web:4b1262b
+    ports: ["127.0.0.1:13000:3000"]
+    environment:
+      TZ: Asia/Shanghai
+      BACKEND_URL: http://api:8083
+      NODE_OPTIONS: --max-old-space-size=80
+    mem_limit: 128m
+    memswap_limit: 128m
+    cpus: 0.20
+    restart: "no"
+    depends_on: [api]
+    logging: *logging
+volumes:
+  db_data:
+  uploads:
+
