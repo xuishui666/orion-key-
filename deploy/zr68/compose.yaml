@@ -35,6 +35,7 @@ services:
       PASSWORD_PLAIN: "false"
       MAIL_ENABLED: "false"
       MAIL_SITE_URL: https://zr68.manxi.cc
+      UPLOAD_PATH: /app/uploads
       JAVA_TOOL_OPTIONS: -Xms64m -Xmx192m -XX:+UseSerialGC -XX:ActiveProcessorCount=1 -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=32m -Xss512k
       SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "5"
       SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: "1"
