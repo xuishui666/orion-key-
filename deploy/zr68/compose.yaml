@@ -24,7 +24,7 @@ services:
         max-size: 5m
         max-file: "2"
   api:
-    image: ghcr.io/xuishui666/orion-key-api:2068703
+    image: ghcr.io/xuishui666/orion-key-api:999be3e
     ports: ["127.0.0.1:18083:8083"]
     environment:
       TZ: Asia/Shanghai
