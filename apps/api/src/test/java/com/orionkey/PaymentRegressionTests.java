@@ -75,6 +75,17 @@ class PaymentRegressionTests {
         Map<?, ?> revenue = (Map<?, ?>) adminOrders.getRevenueStats("2098-01-01", "2098-01-01");
         assertEquals(1L, ((Number) revenue.get("order_count")).longValue());
         assertEquals(0, new BigDecimal(revenue.get("total_amount").toString()).compareTo(new BigDecimal("10.00")));
+        assertNotNull(adminOrders.getRevenueStats(null, null));
+        assertNotNull(adminOrders.getRevenueStats("2098-01-01", null));
+        assertNotNull(adminOrders.getRevenueStats(null, "2098-01-01"));
+        // PostgreSQL cannot infer timestamp types for standalone nullable parameters.
+        for (var method : OrderRepository.class.getMethods()) {
+            if (method.getName().startsWith("summarizeRevenue")) {
+                String query = method.getAnnotation(org.springframework.data.jpa.repository.Query.class).value();
+                assertFalse(query.contains(":start IS NULL"));
+                assertFalse(query.contains(":end IS NULL"));
+            }
+        }
         adminKeys.deleteCardKey(key.getId());
         assertEquals(0, keys.countByProductIdAndStatus(product.getId(), com.orionkey.constant.CardKeyStatus.AVAILABLE));
     }

@@ -108,12 +108,12 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
                                          @Param("keywordPattern") String keywordPattern,
                                          Pageable pageable);
 
-    @Query("SELECT COALESCE(SUM(o.actualAmount), 0), COUNT(o) FROM Order o WHERE (o.status = com.orionkey.constant.OrderStatus.PAID OR o.status = com.orionkey.constant.OrderStatus.DELIVERED) AND (:start IS NULL OR o.paidAt >= :start) AND (:end IS NULL OR o.paidAt < :end)")
+    @Query("SELECT COALESCE(SUM(o.actualAmount), 0), COUNT(o) FROM Order o WHERE (o.status = com.orionkey.constant.OrderStatus.PAID OR o.status = com.orionkey.constant.OrderStatus.DELIVERED) AND o.paidAt >= :start AND o.paidAt < :end")
     List<Object[]> summarizeRevenue(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT COALESCE(o.paymentMethod, 'unknown'), COALESCE(SUM(o.actualAmount), 0), COUNT(o) FROM Order o WHERE (o.status = com.orionkey.constant.OrderStatus.PAID OR o.status = com.orionkey.constant.OrderStatus.DELIVERED) AND (:start IS NULL OR o.paidAt >= :start) AND (:end IS NULL OR o.paidAt < :end) GROUP BY o.paymentMethod")
+    @Query("SELECT COALESCE(o.paymentMethod, 'unknown'), COALESCE(SUM(o.actualAmount), 0), COUNT(o) FROM Order o WHERE (o.status = com.orionkey.constant.OrderStatus.PAID OR o.status = com.orionkey.constant.OrderStatus.DELIVERED) AND o.paidAt >= :start AND o.paidAt < :end GROUP BY o.paymentMethod")
     List<Object[]> summarizeRevenueByPaymentMethod(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT oi.productTitle, COALESCE(SUM(oi.subtotal), 0), SUM(oi.quantity) FROM Order o JOIN OrderItem oi ON oi.orderId = o.id WHERE (o.status = com.orionkey.constant.OrderStatus.PAID OR o.status = com.orionkey.constant.OrderStatus.DELIVERED) AND (:start IS NULL OR o.paidAt >= :start) AND (:end IS NULL OR o.paidAt < :end) GROUP BY oi.productTitle ORDER BY COALESCE(SUM(oi.subtotal), 0) DESC")
+    @Query("SELECT oi.productTitle, COALESCE(SUM(oi.subtotal), 0), SUM(oi.quantity) FROM Order o JOIN OrderItem oi ON oi.orderId = o.id WHERE (o.status = com.orionkey.constant.OrderStatus.PAID OR o.status = com.orionkey.constant.OrderStatus.DELIVERED) AND o.paidAt >= :start AND o.paidAt < :end GROUP BY oi.productTitle ORDER BY COALESCE(SUM(oi.subtotal), 0) DESC")
     List<Object[]> summarizeRevenueByProduct(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }
