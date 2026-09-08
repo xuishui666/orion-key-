@@ -572,6 +572,8 @@ export const adminConfigApi = {
 // ============================================================
 
 export const adminLogApi = {
+  batchDelete: (ids: string[]) =>
+    request<{ deleted_count: number }>("/admin/operation-logs/batch-delete", { method: "POST", body: JSON.stringify({ ids }) }),
   getList: (params: { page?: number; page_size?: number; user_id?: string; action?: string; target_type?: string; start_date?: string; end_date?: string }) => {
     const qs = buildQuery(params)
     return request<PaginatedData<OperationLog>>(`/admin/operation-logs?${qs}`)
@@ -676,3 +678,4 @@ export function getApiErrorMessage(err: unknown, t: (key: any) => string): strin
   }
   return err instanceof Error ? (err.message?.trim() || fallback) : fallback
 }
+

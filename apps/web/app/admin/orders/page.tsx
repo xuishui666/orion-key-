@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { RevenueStats } from "@/components/admin/revenue-stats"
 import { Search, ChevronDown, Eye, Download, ChevronLeft, ChevronRight, X, CheckCircle, Trash2 } from "lucide-react"
 import { cn, stripInvisible } from "@/lib/utils"
 import { useLocale } from "@/lib/context"
@@ -42,17 +43,7 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrderItem[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [deleting, setDeleting] = useState(false)
-  const [startDate, setStartDate] = useState("")
-  const [endDate, setEndDate] = useState("")
-  const [revenue, setRevenue] = useState<Awaited<ReturnType<typeof adminOrderApi.getRevenueStats>> | null>(null)
-  const [statsLoading, setStatsLoading] = useState(false)
-  const fetchRevenue = async () => {
-    setStatsLoading(true)
-    try {
-      setRevenue(await adminOrderApi.getRevenueStats({ start_date: startDate || undefined, end_date: endDate || undefined }))
-    } catch (err) { toast.error(getApiErrorMessage(err, t)) }
-    finally { setStatsLoading(false) }
-  }
+  const [statsRevision, setStatsRevision] = useState(0)
   const deleteOrders = async (ids: string[]) => {
     if (!ids.length || !window.confirm(`确认隐藏这 ${ids.length} 个订单？支付记录将保留。`)) return
     setDeleting(true)
@@ -62,7 +53,7 @@ export default function AdminOrdersPage() {
       setSelected([])
       setShowDetail(null)
       await fetchOrders()
-      setRevenue(null)
+      setStatsRevision(value => value + 1)
     } catch (err) { toast.error(getApiErrorMessage(err, t)) }
     finally { setDeleting(false) }
   }
@@ -173,21 +164,7 @@ export default function AdminOrdersPage() {
         </button>
       </div>
 
-      <section className="space-y-3 border-y border-border py-4">
-        <h2 className="text-base font-semibold">营业额查询</h2>
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="text-sm">开始日期<input aria-label="开始日期" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="block rounded border border-input bg-background p-2" /></label>
-          <label className="text-sm">结束日期<input aria-label="结束日期" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="block rounded border border-input bg-background p-2" /></label>
-          <button type="button" disabled={statsLoading} onClick={fetchRevenue} className="flex items-center gap-2 rounded border border-input p-2 text-sm disabled:opacity-50"><Search className="h-4 w-4" />查询</button>
-        </div>
-        {revenue && <div className="space-y-3 text-sm">
-          <p>营业额：¥{Number(revenue.total_amount).toFixed(2)} · 已付款订单：{revenue.order_count}</p>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div><h3 className="font-medium">按渠道</h3>{revenue.by_payment_method.map((row, i) => <p key={i} className="flex justify-between gap-3 border-b py-2"><span>{row.payment_method}</span><span>¥{Number(row.amount).toFixed(2)} · {row.count} 单</span></p>)}</div>
-            <div><h3 className="font-medium">按商品</h3>{revenue.by_product.map((row, i) => <p key={i} className="flex justify-between gap-3 border-b py-2"><span className="break-all">{row.product_title}</span><span className="shrink-0">¥{Number(row.amount).toFixed(2)} · {row.count} 件</span></p>)}</div>
-          </div>
-        </div>}
-      </section>
+      <RevenueStats key={statsRevision} />
       <button type="button" disabled={!selected.length || deleting} onClick={() => deleteOrders(selected)} className="flex w-fit items-center gap-2 rounded border border-input p-2 text-sm text-destructive disabled:opacity-50"><Trash2 className="h-4 w-4" />批量删除 ({selected.length})</button>
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
@@ -579,3 +556,4 @@ export default function AdminOrdersPage() {
     </div>
   )
 }
+

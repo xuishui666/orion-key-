@@ -1,8 +1,8 @@
 "use client"
 
 import {
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -31,17 +31,7 @@ export function SalesChart({ trends }: { trends: SalesTrend[] }) {
       </div>
       <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={trends} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-            <defs>
-              <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="ordersGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
+          <BarChart data={trends} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis
               dataKey="date"
@@ -50,10 +40,12 @@ export function SalesChart({ trends }: { trends: SalesTrend[] }) {
               tickLine={false}
             />
             <YAxis
+              yAxisId="sales"
               tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
               axisLine={false}
               tickLine={false}
             />
+            <YAxis yAxisId="orders" orientation="right" allowDecimals={false} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
             <Tooltip
               contentStyle={{
                 background: "hsl(var(--card))",
@@ -62,25 +54,26 @@ export function SalesChart({ trends }: { trends: SalesTrend[] }) {
                 fontSize: "12px",
               }}
             />
-            <Area
-              type="monotone"
+            <Bar
+              yAxisId="sales"
+              isAnimationActive={false}
+              maxBarSize={24}
               dataKey="sales_amount"
-              stroke="hsl(217, 91%, 60%)"
-              strokeWidth={2}
-              fill="url(#salesGradient)"
+              fill="#3b82f6"
               name={`${t("admin.salesAmount")} (¥)`}
             />
-            <Area
-              type="monotone"
+            <Bar
+              yAxisId="orders"
+              isAnimationActive={false}
+              maxBarSize={24}
               dataKey="order_count"
-              stroke="hsl(160, 84%, 39%)"
-              strokeWidth={2}
-              fill="url(#ordersGradient)"
+              fill="#10b981"
               name={t("admin.orderCount")}
             />
-          </AreaChart>
+          </BarChart>
         </ResponsiveContainer>
       </div>
     </div>
   )
 }
+

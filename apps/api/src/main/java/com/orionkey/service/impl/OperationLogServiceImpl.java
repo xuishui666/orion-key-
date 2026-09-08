@@ -13,12 +13,25 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.UUID;
+import java.util.List;
+import com.orionkey.constant.ErrorCode;
+import com.orionkey.exception.BusinessException;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class OperationLogServiceImpl implements OperationLogService {
 
     private final OperationLogRepository operationLogRepository;
+
+    @Override
+    @Transactional
+    public int deleteLogs(List<UUID> ids) {
+        if (ids == null || ids.isEmpty() || ids.size() > 500 || ids.stream().anyMatch(java.util.Objects::isNull)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请选择 1 至 500 条日志");
+        }
+        return operationLogRepository.deleteSelected(ids.stream().distinct().toList());
+    }
 
     @Override
     public PageResult<?> listLogs(UUID userId, String action, String targetType,
@@ -45,3 +58,4 @@ public class OperationLogServiceImpl implements OperationLogService {
         operationLogRepository.save(log);
     }
 }
+

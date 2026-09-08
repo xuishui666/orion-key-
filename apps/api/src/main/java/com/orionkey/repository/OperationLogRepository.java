@@ -5,12 +5,17 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.List;
 
 public interface OperationLogRepository extends JpaRepository<OperationLog, UUID> {
+    @Modifying
+    @Query("DELETE FROM OperationLog o WHERE o.id IN :ids")
+    int deleteSelected(@Param("ids") List<UUID> ids);
 
     @Query(value = "SELECT * FROM operation_logs o WHERE " +
             "(CAST(:userId AS uuid) IS NULL OR o.user_id = CAST(:userId AS uuid)) " +
@@ -33,3 +38,4 @@ public interface OperationLogRepository extends JpaRepository<OperationLog, UUID
                                      @Param("endDate") LocalDateTime endDate,
                                      Pageable pageable);
 }
+

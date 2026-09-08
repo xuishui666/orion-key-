@@ -7,6 +7,7 @@ const zh = {
   "nav.orders": "订单查询",
   "nav.login": "登录",
   "nav.register": "注册",
+  "admin.revenueStats": "销售额统计",
   "nav.profile": "个人中心",
   "nav.myOrders": "购买记录",
   "nav.logout": "退出登录",
@@ -633,6 +634,7 @@ const en: Record<keyof typeof zh, string> = {
   "nav.orders": "Order Query",
   "nav.login": "Login",
   "nav.register": "Register",
+  "admin.revenueStats": "Revenue Statistics",
   "nav.profile": "Profile",
   "nav.myOrders": "My Orders",
   "nav.logout": "Logout",
@@ -1259,3 +1261,4 @@ export function getDictionary(locale: Locale) {
 }
 
 export type TranslationKey = keyof typeof zh
+
