@@ -73,20 +73,24 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     public List<?> getSalesTrend(String period, String startDate, String endDate) {
-        LocalDate start = startDate != null ? LocalDate.parse(startDate) : LocalDate.now().minusDays(30);
+        LocalDate start = startDate != null ? LocalDate.parse(startDate) : LocalDate.now().minusDays(29);
         LocalDate end = endDate != null ? LocalDate.parse(endDate) : LocalDate.now();
+        if (start.isAfter(end) || java.time.temporal.ChronoUnit.DAYS.between(start, end) > 3660) {
+            throw new com.orionkey.exception.BusinessException(com.orionkey.constant.ErrorCode.BAD_REQUEST, "Invalid date range");
+        }
 
         // Still load filtered orders for trend grouping, but with date range filter
         LocalDateTime startDt = start.atStartOfDay();
         LocalDateTime endDt = end.plusDays(1).atStartOfDay();
 
-        List<Order> orders = orderRepository.findAll().stream()
-                .filter(o -> (o.getStatus() == OrderStatus.PAID || o.getStatus() == OrderStatus.DELIVERED) && o.getPaidAt() != null)
-                .filter(o -> !o.getPaidAt().isBefore(startDt) && o.getPaidAt().isBefore(endDt))
-                .toList();
+        List<Order> orders = orderRepository.findPaidInRange(startDt, endDt);
 
         Map<String, BigDecimal> salesMap = new TreeMap<>();
         Map<String, Integer> countMap = new TreeMap<>();
+        for (LocalDate day = start; !day.isAfter(end); day = day.plusDays(1)) {
+            String key = "monthly".equals(period) ? day.toString().substring(0, 7) : day.toString();
+            salesMap.putIfAbsent(key, BigDecimal.ZERO);
+        }
 
         for (Order o : orders) {
             String key;
