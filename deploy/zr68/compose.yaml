@@ -44,8 +44,8 @@ services:
       LOGGING_LEVEL_COM_ORIONKEY: INFO
     volumes:
       - uploads:/app/uploads
-    mem_limit: 384m
-    memswap_limit: 384m
+    mem_limit: 512m
+    memswap_limit: 512m
     cpus: 0.40
     restart: "no"
     depends_on:
@@ -53,7 +53,7 @@ services:
         condition: service_healthy
     logging: *logging
   web:
-    image: ghcr.io/xuishui666/orion-key-web:4b1262b
+    image: ghcr.io/xuishui666/orion-key-web:150c0b1
     ports: ["127.0.0.1:13000:3000"]
     environment:
       TZ: Asia/Shanghai
