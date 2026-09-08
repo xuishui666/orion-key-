@@ -7,7 +7,6 @@ import { Eye, EyeOff, UserPlus, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { useLocale } from "@/lib/context"
 import { authApi, withMockFallback, getApiErrorMessage } from "@/services/api"
-import { mockCaptcha } from "@/lib/mock-data"
 import { Turnstile, useTurnstile } from "@/components/shared/turnstile"
 
 export default function RegisterPage() {
@@ -29,22 +28,19 @@ export default function RegisterPage() {
 
   const fetchCaptcha = useCallback(async () => {
     setCaptchaLoading(true)
+    setCaptchaId("")
+    setCaptchaImage("")
+    setForm((prev) => ({ ...prev, captcha: "" }))
     try {
-      const result = await withMockFallback(
-        () => authApi.getCaptcha(),
-        () => mockCaptcha()
-      )
+      const result = await authApi.getCaptcha()
       setCaptchaId(result.captcha_id)
       setCaptchaImage(result.captcha_image)
-    } catch {
-      // silent fail — use mock
-      const mock = mockCaptcha()
-      setCaptchaId(mock.captcha_id)
-      setCaptchaImage(mock.captcha_image)
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, t))
     } finally {
       setCaptchaLoading(false)
     }
-  }, [])
+  }, [t])
 
   // Fetch captcha on mount
   useEffect(() => {
@@ -57,6 +53,7 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isLoading || captchaLoading || !captchaId) return
     if (!form.username.trim() || !form.email.trim() || !form.password.trim() || !form.captcha.trim()) {
       return
     }
@@ -175,10 +172,13 @@ export default function RegisterPage() {
                   className="h-10 flex-1 rounded-lg border border-input bg-background px-3 text-sm uppercase text-foreground tracking-wider focus:outline-none focus:ring-2 focus:ring-ring"
                   required
                 />
-                <div
+                <button
+                  type="button"
                   className="relative flex h-10 w-24 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-muted overflow-hidden"
                   onClick={fetchCaptcha}
+                  disabled={captchaLoading || isLoading}
                   title={t("auth.clickToRefresh")}
+                  aria-label={t("auth.clickToRefresh")}
                 >
                   {captchaLoading ? (
                     <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -190,7 +190,7 @@ export default function RegisterPage() {
                     </span>
                   )}
                   <RefreshCw className="absolute right-1 top-1 h-3 w-3 text-muted-foreground" />
-                </div>
+                </button>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 {t("auth.clickToRefresh")}
@@ -202,7 +202,7 @@ export default function RegisterPage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={isLoading || !turnstileReady}
+              disabled={isLoading || captchaLoading || !captchaId || !turnstileReady}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
             >
               {isLoading ? (
@@ -225,3 +225,4 @@ export default function RegisterPage() {
     </div>
   )
 }
+

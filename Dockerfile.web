@@ -53,7 +53,9 @@ COPY apps/web/ ./apps/web/
 # 构建 Next.js 生产版本
 # --filter @orion-key/web: pnpm 工作区过滤器，只构建前端包
 # 构建产物在 apps/web/.next/ 目录下
-RUN pnpm --filter @orion-key/web build
+# Next.js rewrites are resolved at build time, not container startup.
+ARG BACKEND_URL=http://api:8083
+RUN BACKEND_URL="$BACKEND_URL" pnpm --filter @orion-key/web build
 
 
 # ── Stage 2: 运行阶段 ──
@@ -97,3 +99,4 @@ ENV PORT=3000 HOSTNAME="0.0.0.0"
 # CMD: 容器启动时执行的命令
 # 运行 Next.js standalone 服务端
 CMD ["node", "apps/web/server.js"]
+
