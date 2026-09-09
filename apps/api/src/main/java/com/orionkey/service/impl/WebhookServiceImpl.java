@@ -219,7 +219,6 @@ public class WebhookServiceImpl implements WebhookService {
         String apiToken = resolveBepusdtApiToken(order);
         if (apiToken == null) {
             log.error("BEpusdt callback rejected: api_token not configured for channel {}", order.getPaymentMethod());
-            saveWebhookEvent(eventId, "usdt", order.getId(), signParams.toString(), "NO_API_TOKEN");
             return "fail";
         }
         if (!bepusdtService.verifySign(apiToken, signParams, signature)) {
@@ -240,8 +239,8 @@ public class WebhookServiceImpl implements WebhookService {
         if (actualAmount == null || actualAmount.isBlank() || order.getUsdtCryptoAmount() == null) {
             log.error("BEpusdt callback missing amount data: actual_amount={}, orderCrypto={}, order={}",
                     actualAmount, order.getUsdtCryptoAmount(), orderId);
-            saveWebhookEvent(eventId, "usdt", order.getId(), signParams.toString(), "MISSING_AMOUNT");
-            return "ok";
+            // Payment context may still be committing when the callback arrives.
+            return "fail";
         }
         BigDecimal bepCallbackAmount;
         BigDecimal bepOrderAmount;
@@ -283,7 +282,7 @@ public class WebhookServiceImpl implements WebhookService {
             log.error("BEpusdt callback rejected by on-chain verification: {}, trade_id={}, txid={}",
                     chainResult.reason(), tradeId, blockTxId);
             // Do not consume the event: a transaction may still be awaiting confirmations.
-            return "ok";
+            return "fail";
         }
         log.info("BEpusdt callback on-chain verification passed: trade_id={}, txid={}", tradeId, blockTxId);
 

@@ -34,6 +34,9 @@ public class PaymentWebhookController {
     public ResponseEntity<String> handleBepusdtCallback(@RequestBody Map<String, Object> params) {
         log.info("BEpusdt callback received: {}", params);
         String result = webhookService.processBepusdtCallback(params);
-        return ResponseEntity.ok(result);
+        // BEpusdt acknowledges HTTP 200 even when the response body says "fail".
+        return "ok".equalsIgnoreCase(result)
+                ? ResponseEntity.ok(result)
+                : ResponseEntity.status(503).body("fail");
     }
 }
