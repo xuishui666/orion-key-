@@ -53,6 +53,11 @@ public class TxidVerifyServiceImpl implements TxidVerifyService {
             BSC_USDT_CONTRACT.toLowerCase()
     );
 
+    private static final List<String> BSC_RPC_URLS = List.of(
+            "https://bsc-rpc.publicnode.com",
+            "https://bsc-dataseed.bnbchain.org/"
+    );
+
     /**
      * 交易时间校验缓冲（秒）：链上交易时间必须 ≥ 订单创建时间 - 此缓冲值。
      * 正常流程中用户必须先拿到钱包地址才能转账，交易一定在订单之后；
@@ -283,8 +288,23 @@ public class TxidVerifyServiceImpl implements TxidVerifyService {
      * 不依赖 BscScan REST API（已废弃 V1，V2 需付费）。
      */
     private ChainTransaction queryBscTransaction(String txid) {
-        String rpcUrl = "https://bsc-dataseed.bnbchain.org/";
         log.info("Querying BSC RPC receipt: txid={}", txid);
+
+        RuntimeException lastError = null;
+        for (String rpcUrl : BSC_RPC_URLS) {
+            try {
+                ChainTransaction transaction = queryBscTransaction(rpcUrl, txid);
+                if (transaction != null) return transaction;
+            } catch (RuntimeException e) {
+                lastError = e;
+                log.warn("BSC RPC unavailable, trying fallback: rpc={}, error={}", rpcUrl, e.getMessage());
+            }
+        }
+        if (lastError != null) throw lastError;
+        return null;
+    }
+
+    private ChainTransaction queryBscTransaction(String rpcUrl, String txid) {
 
         Map<String, Object> rpcRequest = Map.of(
                 "jsonrpc", "2.0",
@@ -524,3 +544,4 @@ public class TxidVerifyServiceImpl implements TxidVerifyService {
         return sb.reverse().toString();
     }
 }
+

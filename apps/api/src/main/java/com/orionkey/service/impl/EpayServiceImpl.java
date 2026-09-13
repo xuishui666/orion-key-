@@ -107,11 +107,11 @@ public class EpayServiceImpl implements EpayService {
 
                 String resultQrcode = qrcode;
 
-                // 网关未返回 payUrl 且为移动端请求时，将 qrcode（收银台页面 URL）作为 H5 跳转入口
+                // 移动端优先 H5 地址；缺失时二维码字段常为网关收银台 URL。
                 String effectivePayUrl = payUrl;
-                if (effectivePayUrl == null && device != null && !"pc".equals(device) && urlscheme != null) {
-                    effectivePayUrl = urlscheme;
-                    log.info("Epay: gateway returned no payUrl, using urlscheme as mobile redirect: {}", effectivePayUrl);
+                if (effectivePayUrl == null && device != null && !"pc".equals(device)) {
+                    effectivePayUrl = isHttpUrl(qrcode) ? qrcode : urlscheme;
+                    log.info("Epay: gateway returned no payUrl, using mobile fallback: {}", effectivePayUrl);
                 }
 
                 return new EpayResult(code, msg, tradeNo, effectivePayUrl, resultQrcode, urlscheme);
@@ -126,6 +126,10 @@ public class EpayServiceImpl implements EpayService {
 
         log.error("Epay API call failed after {} retries", maxRetries + 1, lastException);
         throw new BusinessException(ErrorCode.WEBHOOK_VERIFY_FAIL, "支付创建失败：网络超时，请重试");
+    }
+
+    private static boolean isHttpUrl(String value) {
+        return value != null && (value.startsWith("https://") || value.startsWith("http://"));
     }
 
     @Override
@@ -208,3 +212,4 @@ public class EpayServiceImpl implements EpayService {
         }
     }
 }
+
