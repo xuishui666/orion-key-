@@ -131,7 +131,17 @@ public class DeviceRateLimitFilter implements Filter {
             return;
         }
 
-        chain.doFilter(request, response);
+        boolean completed = false;
+        try {
+            chain.doFilter(request, response);
+            completed = true;
+        } finally {
+            // Invalid order attempts must not consume the customer's hourly purchase allowance.
+            if (category == Category.ORDER
+                    && (!completed || ((HttpServletResponse) response).getStatus() >= 400)) {
+                counter.decrement();
+            }
+        }
 
         // 定期清理
         long now = System.currentTimeMillis();
@@ -288,6 +298,10 @@ public class DeviceRateLimitFilter implements Filter {
             }
             count++;
             return true;
+        }
+
+        synchronized void decrement() {
+            if (count > 0) count--;
         }
     }
 }

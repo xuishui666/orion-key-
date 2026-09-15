@@ -25,6 +25,13 @@ async function main() {
   assert.equal(utils.safePaymentUrl("javascript:alert(1)"), "")
   assert.equal(utils.safePaymentUrl("data:text/html,test"), "")
   assert.equal(utils.safePaymentUrl("alipays://platformapi/startapp"), "alipays://platformapi/startapp")
+  const values = new Map()
+  const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) }
+  const browserWindow = { localStorage: storage }
+  const fingerprint = load("lib/fingerprint.ts", { window: browserWindow, crypto: { getRandomValues: bytes => bytes.fill(7) } }, { "@/lib/utils": utils })
+  const deviceId = await fingerprint.getDeviceId()
+  assert.match(deviceId, /^[a-f0-9]{64}$/)
+  assert.equal(await fingerprint.getDeviceId(), deviceId)
   const calls = []
   const api = load("services/api.ts", {
     fetch: async (url, options) => {
