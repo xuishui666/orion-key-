@@ -8,7 +8,11 @@ import com.orionkey.service.SupportService;
 import com.orionkey.service.SupportTelegramService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 import java.util.UUID;
@@ -47,6 +51,23 @@ public class SupportController {
         return ApiResponse.success(supportService.customerMessage(id, token, body.get("text")));
     }
 
+    @PostMapping(value = "/conversations/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<?> image(@PathVariable UUID id,
+                                @RequestHeader(value = "X-Support-Token", required = false) String token,
+                                @RequestParam("file") MultipartFile file) {
+        requireEnabled();
+        return ApiResponse.success(supportService.customerImage(id, token, file));
+    }
+
+    @GetMapping("/conversations/{id}/images/{messageId}")
+    public ResponseEntity<byte[]> imageData(@PathVariable UUID id, @PathVariable UUID messageId,
+                                            @RequestHeader(value = "X-Support-Token", required = false) String token) {
+        requireEnabled();
+        var image = supportService.customerImageData(id, messageId, token);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .contentType(MediaType.parseMediaType(image.contentType())).body(image.data());
+    }
+
     @PostMapping("/telegram/webhook")
     public ApiResponse<Void> webhook(
             @RequestHeader(value = "X-Telegram-Bot-Api-Secret-Token", required = false) String secret,
@@ -64,4 +85,3 @@ public class SupportController {
         }
     }
 }
-

@@ -7,8 +7,13 @@ import com.orionkey.repository.SupportMessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
@@ -75,11 +80,26 @@ public class SupportTelegramService {
                 String prefix = conversations.findById(message.getConversationId())
                         .map(c -> c.getOrderReference() == null ? "新客服消息" : "订单 " + c.getOrderReference() + " 的客服消息")
                         .orElse("新客服消息");
-                JsonNode response = restTemplate.postForObject(api("sendMessage"), Map.of(
-                        "chat_id", chatId,
-                        "text", prefix + "\n\n" + message.getText().substring(0, Math.min(300, message.getText().length()))
-                                + "\n\n请直接回复这条消息"
-                ), JsonNode.class);
+                String notice = prefix + "\n\n" + message.getText().substring(0, Math.min(300, message.getText().length()))
+                        + "\n\n请直接回复这条消息";
+                JsonNode response;
+                if (message.isHasImage()) {
+                    var image = supportService.notificationImageData(message);
+                    boolean webp = "image/webp".equals(image.contentType());
+                    var form = new LinkedMultiValueMap<String, Object>();
+                    form.add("chat_id", chatId);
+                    form.add("caption", notice);
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.setContentType(MediaType.parseMediaType(image.contentType()));
+                    String filename = webp ? "image.webp" : "image." + ("image/png".equals(image.contentType()) ? "png" : "jpg");
+                    form.add(webp ? "document" : "photo", new HttpEntity<>(new ByteArrayResource(image.data()) {
+                        @Override public String getFilename() { return filename; }
+                    }, headers));
+                    response = restTemplate.postForObject(api(webp ? "sendDocument" : "sendPhoto"), form, JsonNode.class);
+                } else {
+                    response = restTemplate.postForObject(api("sendMessage"), Map.of(
+                            "chat_id", chatId, "text", notice), JsonNode.class);
+                }
                 if (response == null || !response.path("ok").asBoolean(false)
                         || !response.path("result").path("message_id").canConvertToLong()) {
                     throw new IllegalStateException("Telegram rejected support notification");
@@ -134,4 +154,3 @@ public class SupportTelegramService {
         return "https://api.telegram.org/bot" + botToken + "/" + method;
     }
 }
-

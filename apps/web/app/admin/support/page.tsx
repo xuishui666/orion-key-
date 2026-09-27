@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { RefreshCw, Send } from "lucide-react"
 import { adminSupportApi, getApiErrorMessage, type SupportConversation } from "@/services/api"
+import { SupportImage } from "@/components/store/support-image"
 import { useLocale } from "@/lib/context"
 
 export default function AdminSupportPage() {
@@ -78,7 +79,10 @@ export default function AdminSupportPage() {
               <div className="max-h-[55vh] min-h-60 flex-1 space-y-3 overflow-y-auto p-4">
                 {conversation.messages.map(message => (
                   <div key={message.id} className={message.sender === "ADMIN" ? "flex justify-end" : "flex justify-start"}>
-                    <p className={`max-w-[85%] whitespace-pre-wrap break-words rounded-md px-3 py-2 text-sm ${message.sender === "ADMIN" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>{message.text}</p>
+                    <div className={`max-w-[85%] whitespace-pre-wrap break-words rounded-md px-3 py-2 text-sm ${message.sender === "ADMIN" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                      {message.has_image && <SupportImage conversationId={conversation.id} messageId={message.id} />}
+                      {!message.has_image && message.text}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -93,4 +97,3 @@ export default function AdminSupportPage() {
     </div>
   )
 }
-

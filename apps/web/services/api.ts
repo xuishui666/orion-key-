@@ -530,6 +530,7 @@ export interface SupportMessage {
   id: string
   sender: "CUSTOMER" | "ADMIN"
   text: string
+  has_image: boolean
   created_at: string
 }
 
@@ -555,6 +556,26 @@ export const supportApi = {
     request<SupportMessage>(`/support/conversations/${id}/messages`, {
       method: "POST", headers: { "X-Support-Token": token }, body: JSON.stringify({ text }),
     }),
+  sendImage: async (id: string, token: string, file: File) => {
+    const form = new FormData()
+    form.append("file", file)
+    const deviceId = cachedDeviceId || await ensureDeviceId()
+    const res = await fetch(`${API_BASE}/support/conversations/${id}/images`, {
+      method: "POST",
+      headers: { "X-Support-Token": token, ...(deviceId ? { "X-Device-Id": deviceId } : {}) },
+      body: form,
+    })
+    const body: ApiResponse<SupportMessage> = await res.json()
+    if (!res.ok || body.code !== 0) throw new ApiError(body.code || res.status, body.message || res.statusText)
+    return body.data
+  },
+  image: async (id: string, token: string, messageId: string) => {
+    const res = await fetch(`${API_BASE}/support/conversations/${id}/images/${messageId}`, {
+      headers: { "X-Support-Token": token },
+    })
+    if (!res.ok) throw new Error("Image unavailable")
+    return res.blob()
+  },
 }
 
 export const adminSupportApi = {
@@ -564,6 +585,14 @@ export const adminSupportApi = {
     request<SupportMessage>(`/admin/support/${id}/messages`, {
       method: "POST", body: JSON.stringify({ text }),
     }),
+  image: async (id: string, messageId: string) => {
+    const token = getToken()
+    const res = await fetch(`${API_BASE}/admin/support/${id}/images/${messageId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (!res.ok) throw new Error("Image unavailable")
+    return res.blob()
+  },
 }
 
 // ============================================================
@@ -718,5 +747,4 @@ export function getApiErrorMessage(err: unknown, t: (key: any) => string): strin
   }
   return err instanceof Error ? (err.message?.trim() || fallback) : fallback
 }
-
 

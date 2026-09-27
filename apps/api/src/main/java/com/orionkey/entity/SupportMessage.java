@@ -35,10 +35,12 @@ public class SupportMessage extends BaseEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String text;
 
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean hasImage;
+
     private Long telegramMessageId;
 
     private Long telegramUpdateId;
 
     private LocalDateTime nextNotifyAt;
 }
-

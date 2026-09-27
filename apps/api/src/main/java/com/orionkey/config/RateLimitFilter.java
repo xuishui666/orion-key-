@@ -81,7 +81,7 @@ public class RateLimitFilter implements Filter {
 
         if ("POST".equalsIgnoreCase(httpRequest.getMethod())
                 && ("/api/support/conversations".equals(path)
-                || path.matches("^/api/support/conversations/[^/]+/messages$"))) {
+                || path.matches("^/api/support/conversations/[^/]+/(messages|images)$"))) {
             boolean creating = "/api/support/conversations".equals(path);
             String deviceId = httpRequest.getHeader("X-Device-Id");
             String supportIdentity = deviceId != null && deviceId.matches("[a-fA-F0-9]{64}")
@@ -92,6 +92,14 @@ public class RateLimitFilter implements Filter {
             if (!supportBucket.tryConsume()) {
                 rejectTooManyRequests(response, "客服消息发送过于频繁，请稍后再试");
                 return;
+            }
+            if (path.endsWith("/images")) {
+                TokenBucket imageBucket = supportBuckets.computeIfAbsent("support-image-ip:" + clientIp,
+                        k -> new TokenBucket(20, 3_600_000));
+                if (!imageBucket.tryConsume()) {
+                    rejectTooManyRequests(response, "图片发送过于频繁，请稍后再试");
+                    return;
+                }
             }
             if (creating) {
                 TokenBucket ipBucket = supportBuckets.computeIfAbsent("support-create-ip:" + clientIp,
@@ -236,4 +244,3 @@ public class RateLimitFilter implements Filter {
         }
     }
 }
-
