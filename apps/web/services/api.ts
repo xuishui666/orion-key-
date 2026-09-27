@@ -526,6 +526,46 @@ export const adminOrderApi = {
   },
 }
 
+export interface SupportMessage {
+  id: string
+  sender: "CUSTOMER" | "ADMIN"
+  text: string
+  created_at: string
+}
+
+export interface SupportConversation {
+  id: string
+  email: string | null
+  order_reference: string | null
+  last_activity_at: string
+  messages: SupportMessage[]
+}
+
+export const supportApi = {
+  config: () => request<{ enabled: boolean }>("/support/config"),
+  create: (data: { email: string; order_reference: string; text: string }) =>
+    request<{ id: string; token: string }>("/support/conversations", {
+      method: "POST", body: JSON.stringify(data),
+    }),
+  get: (id: string, token: string) =>
+    request<SupportConversation>(`/support/conversations/${id}`, {
+      headers: { "X-Support-Token": token },
+    }),
+  send: (id: string, token: string, text: string) =>
+    request<SupportMessage>(`/support/conversations/${id}/messages`, {
+      method: "POST", headers: { "X-Support-Token": token }, body: JSON.stringify({ text }),
+    }),
+}
+
+export const adminSupportApi = {
+  list: () => request<SupportConversation[]>("/admin/support"),
+  get: (id: string) => request<SupportConversation>(`/admin/support/${id}`),
+  send: (id: string, text: string) =>
+    request<SupportMessage>(`/admin/support/${id}/messages`, {
+      method: "POST", body: JSON.stringify({ text }),
+    }),
+}
+
 // ============================================================
 // Admin User
 // ============================================================
@@ -678,4 +718,5 @@ export function getApiErrorMessage(err: unknown, t: (key: any) => string): strin
   }
   return err instanceof Error ? (err.message?.trim() || fallback) : fallback
 }
+
 

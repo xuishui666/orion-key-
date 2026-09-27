@@ -31,6 +31,7 @@ public class RateLimitFilter implements Filter {
     private final Map<String, TokenBucket> buckets = new ConcurrentHashMap<>();
     /** 登录端点独立限流桶（更严格） */
     private final Map<String, TokenBucket> loginBuckets = new ConcurrentHashMap<>();
+    private final Map<String, TokenBucket> supportBuckets = new ConcurrentHashMap<>();
 
     /** 受信代理 IP 列表（只有来自受信代理的请求才读取 X-Forwarded-For） */
     @Value("${rate-limit.trusted-proxies:127.0.0.1,::1,0:0:0:0:0:0:0:1}")
@@ -78,6 +79,30 @@ public class RateLimitFilter implements Filter {
 
         String clientIp = resolveClientIp(httpRequest);
 
+        if ("POST".equalsIgnoreCase(httpRequest.getMethod())
+                && ("/api/support/conversations".equals(path)
+                || path.matches("^/api/support/conversations/[^/]+/messages$"))) {
+            boolean creating = "/api/support/conversations".equals(path);
+            String deviceId = httpRequest.getHeader("X-Device-Id");
+            String supportIdentity = deviceId != null && deviceId.matches("[a-fA-F0-9]{64}")
+                    ? deviceId : clientIp;
+            String supportKey = (creating ? "support-create:" : "support-message:") + supportIdentity;
+            TokenBucket supportBucket = supportBuckets.computeIfAbsent(supportKey,
+                    k -> new TokenBucket(creating ? 10 : 60, 3_600_000));
+            if (!supportBucket.tryConsume()) {
+                rejectTooManyRequests(response, "客服消息发送过于频繁，请稍后再试");
+                return;
+            }
+            if (creating) {
+                TokenBucket ipBucket = supportBuckets.computeIfAbsent("support-create-ip:" + clientIp,
+                        k -> new TokenBucket(100, 3_600_000));
+                if (!ipBucket.tryConsume()) {
+                    rejectTooManyRequests(response, "客服会话创建过于频繁，请稍后再试");
+                    return;
+                }
+            }
+        }
+
         // 登录/注册端点：独立的更严格限流（每分钟 LOGIN_RATE_PER_MINUTE 次）
         if (LOGIN_PATHS.contains(path)) {
             String loginKey = "login:" + clientIp;
@@ -106,6 +131,9 @@ public class RateLimitFilter implements Filter {
         }
         if (loginBuckets.size() > 5000) {
             loginBuckets.entrySet().removeIf(e -> now - e.getValue().lastAccess > 120_000);
+        }
+        if (supportBuckets.size() > 5000) {
+            supportBuckets.entrySet().removeIf(e -> now - e.getValue().lastAccess > 3_600_000);
         }
     }
 
@@ -208,3 +236,4 @@ public class RateLimitFilter implements Filter {
         }
     }
 }
+

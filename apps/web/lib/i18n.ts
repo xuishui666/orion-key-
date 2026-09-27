@@ -304,6 +304,7 @@ const zh = {
   "admin.categories": "分类管理",
   "admin.cardKeys": "卡密管理",
   "admin.orders": "订单管理",
+  "admin.support": "客服会话",
   "admin.users": "用户管理",
   "admin.payment": "支付渠道",
   "admin.siteConfig": "网站设置",
@@ -931,6 +932,7 @@ const en: Record<keyof typeof zh, string> = {
   "admin.categories": "Categories",
   "admin.cardKeys": "Card Keys",
   "admin.orders": "Orders",
+  "admin.support": "Support",
   "admin.users": "Users",
   "admin.payment": "Payment",
   "admin.siteConfig": "Site Config",
@@ -1261,4 +1263,5 @@ export function getDictionary(locale: Locale) {
 }
 
 export type TranslationKey = keyof typeof zh
+
 

@@ -9,6 +9,7 @@ import {
   FolderTree,
   KeyRound,
   ShoppingCart,
+  MessagesSquare,
   Users,
   CreditCard,
   Settings,
@@ -34,6 +35,7 @@ const navItems: { labelKey: TranslationKey; href: string; icon: typeof LayoutDas
   { labelKey: "admin.products", href: "/admin/products", icon: Package },
   { labelKey: "admin.cardKeys", href: "/admin/card-keys", icon: KeyRound },
   { labelKey: "admin.orders", href: "/admin/orders", icon: ShoppingCart },
+  { labelKey: "admin.support", href: "/admin/support", icon: MessagesSquare },
   { labelKey: "admin.revenueStats", href: "/admin/revenue", icon: BarChart3 },
   { labelKey: "admin.users", href: "/admin/users", icon: Users },
   { labelKey: "admin.payment", href: "/admin/payment-channels", icon: CreditCard },
@@ -226,4 +228,5 @@ export function AdminSidebar() {
     </>
   )
 }
+
 
