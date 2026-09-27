@@ -82,7 +82,7 @@ public class SupportService {
 
     @Transactional
     public boolean telegramReply(long repliedMessageId, long updateId, String text) {
-        if (messages.existsByTelegramUpdateId(updateId)) return false;
+        if (messages.existsByTelegramUpdateId(updateId)) return true;
         SupportMessage original = messages.findByTelegramMessageId(repliedMessageId)
                 .orElse(null);
         if (original == null || original.getSender() != SupportMessage.Sender.CUSTOMER) return false;
