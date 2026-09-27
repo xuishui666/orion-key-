@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown"
 import { StoreHeader } from "@/components/layout/store-header"
 import { StoreFooter } from "@/components/layout/store-footer"
 import { VisitTracker } from "@/components/store/visit-tracker"
+import { SupportWidget } from "@/components/store/support-widget"
 import { Modal } from "@/components/ui/modal"
 import { useSiteConfig, useAuth, useLocale } from "@/lib/context"
 
@@ -152,7 +153,9 @@ export function StoreShell({ siteName, children }: StoreShellProps) {
       <StoreHeader siteName={siteName} />
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 lg:px-6">{children}</main>
       <StoreFooter />
+      <SupportWidget />
       <PopupAnnouncement />
     </div>
   )
 }
+

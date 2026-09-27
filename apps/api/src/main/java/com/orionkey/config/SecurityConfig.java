@@ -62,6 +62,7 @@ public class SecurityConfig {
                         .requestMatchers("/cart/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/visit/track").permitAll()
+                        .requestMatchers("/support/**").permitAll()
                         // Authenticated user endpoints
                         .requestMatchers("/auth/logout").authenticated()
                         .requestMatchers("/user/**").authenticated()
@@ -75,3 +76,4 @@ public class SecurityConfig {
         return http.build();
     }
 }
+

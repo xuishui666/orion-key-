@@ -85,3 +85,11 @@ logging:
   level:
     com.orionkey: DEBUG
     org.springframework.security: WARN
+
+support:
+  telegram:
+    bot-token: ${SUPPORT_TELEGRAM_BOT_TOKEN:}
+    chat-id: ${SUPPORT_TELEGRAM_CHAT_ID:}
+    webhook-secret: ${SUPPORT_TELEGRAM_WEBHOOK_SECRET:}
+    webhook-url: ${SUPPORT_TELEGRAM_WEBHOOK_URL:}
+
