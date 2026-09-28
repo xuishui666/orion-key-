@@ -12,7 +12,7 @@ services:
     mem_limit: 128m
     memswap_limit: 128m
     cpus: 0.20
-    restart: "no"
+    restart: unless-stopped
     healthcheck:
       test: [CMD-SHELL, "pg_isready -U orion_zr68 -d orion_zr68"]
       interval: 10s
@@ -24,7 +24,7 @@ services:
         max-size: 5m
         max-file: "2"
   api:
-    image: ghcr.io/xuishui666/orion-key-api:0b91f65
+    image: ghcr.io/xuishui666/orion-key-api:d16092a
     ports: ["127.0.0.1:18083:8083"]
     environment:
       TZ: Asia/Shanghai
@@ -51,13 +51,13 @@ services:
     mem_limit: 512m
     memswap_limit: 512m
     cpus: 0.40
-    restart: "no"
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     logging: *logging
   web:
-    image: ghcr.io/xuishui666/orion-key-web:0b91f65
+    image: ghcr.io/xuishui666/orion-key-web:d16092a
     ports: ["127.0.0.1:13000:3000"]
     environment:
       TZ: Asia/Shanghai
@@ -66,10 +66,9 @@ services:
     mem_limit: 128m
     memswap_limit: 128m
     cpus: 0.20
-    restart: "no"
+    restart: unless-stopped
     depends_on: [api]
     logging: *logging
 volumes:
   db_data:
   uploads:
-

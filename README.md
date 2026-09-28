@@ -18,6 +18,8 @@ Automated Digital Goods Delivery Platform
 
 简体中文 | [English](README.en.md)
 
+[本 fork 的宝塔部署与重建指南](deploy/zr68/README.md)
+
 </div>
 
 ---
@@ -115,7 +117,7 @@ orion-key/
 │           │   └── model/            # DTO / VO
 │           └── resources/
 │               ├── application.yml   # 应用配置（数据库、JWT、邮件、上传等）
-│               └── data.sql          # 初始化数据（管理员、站点配置、支付渠道）
+│               └── data.sql          # 旧版示例数据；生产环境勿用它创建管理员
 │
 ├── docker-compose.yml                # Docker Compose 编排（生产 / 本地通用）
 ├── .env.example                      # 环境变量模板
@@ -154,10 +156,7 @@ spring:
     password: ${DB_PASSWORD:your_password}
 ```
 
-首次启动自动建表（`ddl-auto: update`），启动后执行一次初始化 SQL(data.sql文件) 写入管理员账户、站点配置：
-
-
-> SQL 内置 `WHERE NOT EXISTS`，多次执行不会产生重复数据。
+首次启动自动建表（`ddl-auto: update`）。空用户库会由应用自动创建初始管理员；生产环境不要执行旧版 `data.sql` 写入账户，详见 [管理员初始化](ADMIN-BOOTSTRAP.md)。
 
 ### JWT 认证
 
@@ -210,7 +209,9 @@ upload:
 
 ## 部署
 
-> 完整生产部署（含服务器初始化、Nginx/HTTPS、CI/CD、BEpusdt USDT 支付等），本节仅给出最小启动路径。
+> 本 fork 在宝塔服务器上的完整重建、恢复、升级与回滚步骤见 [zr68 部署指南](deploy/zr68/README.md)。它使用独立 PostgreSQL 卷、固定 GHCR 镜像标签和单独运行的 BEpusdt；不要把下面的通用示例直接覆盖到现有站点。
+
+> 下方是上游通用示例，会拉取上游镜像；重建 `zr68.manxi.cc` 时请只按上方 fork 专用指南操作。
 
 ### 方式一：Docker 部署（推荐）
 
