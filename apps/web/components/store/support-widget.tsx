@@ -5,14 +5,17 @@ import { ImagePlus, MessageCircle, Send, X } from "lucide-react"
 import { getApiErrorMessage, supportApi, type SupportConversation } from "@/services/api"
 import { SupportImage } from "@/components/store/support-image"
 import { safeStorageGet, safeStorageRemove, safeStorageSet } from "@/lib/utils"
-import { useLocale } from "@/lib/context"
+import { useLocale, useSiteConfig } from "@/lib/context"
 
 const STORAGE_KEY = "support_conversation"
+const DEFAULT_WELCOME_MESSAGE = "您好，请描述遇到的问题，客服收到后会尽快回复。"
 type Session = { id: string; token: string }
 
 export function SupportWidget() {
   const { locale, t } = useLocale()
+  const { config } = useSiteConfig()
   const zh = locale === "zh"
+  const welcomeMessage = (config?.support_welcome_message ?? DEFAULT_WELCOME_MESSAGE).trim()
   const [enabled, setEnabled] = useState(false)
   const [open, setOpen] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
@@ -127,6 +130,11 @@ export function SupportWidget() {
         <section aria-label={zh ? "客服会话" : "Support chat"} className="fixed bottom-36 left-4 right-4 z-[60] flex h-[min(70dvh,480px)] max-h-[calc(100dvh-10rem)] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl sm:left-auto sm:w-[360px]">
           <div className="border-b border-border px-4 py-3 text-sm font-semibold">{zh ? "在线客服" : "Support"}</div>
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3" aria-live="polite">
+            {welcomeMessage && (
+              <div className="flex justify-start">
+                <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-lg bg-muted px-3 py-2 text-sm text-foreground">{welcomeMessage}</div>
+              </div>
+            )}
             {conversation?.messages.map(message => (
               <div key={message.id} className={message.sender === "CUSTOMER" ? "flex justify-end" : "flex justify-start"}>
                 <div className={`max-w-[85%] whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-sm ${message.sender === "CUSTOMER" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>
@@ -135,7 +143,7 @@ export function SupportWidget() {
                 </div>
               </div>
             ))}
-            {!conversation && <p className="text-sm text-muted-foreground">{zh ? "请描述你的问题，客服收到后会回复。" : "Tell us how we can help."}</p>}
+            {!conversation && !welcomeMessage && <p className="text-sm text-muted-foreground">{zh ? "请描述你的问题，客服收到后会回复。" : "Tell us how we can help."}</p>}
             <div ref={bottom} />
           </div>
           <form onSubmit={submit} className="space-y-2 border-t border-border p-3">

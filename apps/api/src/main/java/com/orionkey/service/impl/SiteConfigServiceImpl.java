@@ -1,6 +1,8 @@
 package com.orionkey.service.impl;
 
 import com.orionkey.entity.SiteConfig;
+import com.orionkey.constant.ErrorCode;
+import com.orionkey.exception.BusinessException;
 import com.orionkey.repository.SiteConfigRepository;
 import com.orionkey.service.SiteConfigService;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +28,7 @@ public class SiteConfigServiceImpl implements SiteConfigService {
     private static final List<String> PUBLIC_KEYS = List.of(
             "site_name", "site_slogan", "site_description", "logo_url", "favicon_url",
             "announcement_enabled", "announcement", "popup_enabled", "popup_content",
-            "contact_email", "contact_telegram", "contact_telegram_group", "points_enabled", "points_rate",
+            "contact_email", "contact_telegram", "contact_telegram_group", "support_welcome_message", "points_enabled", "points_rate",
             "maintenance_enabled", "maintenance_message", "footer_text", "github_url", "custom_css"
     );
 
@@ -37,7 +39,7 @@ public class SiteConfigServiceImpl implements SiteConfigService {
             // 公告 / 弹窗
             "announcement_enabled", "announcement", "popup_enabled", "popup_content",
             // 联系方式
-            "contact_email", "contact_telegram", "contact_telegram_group",
+            "contact_email", "contact_telegram", "contact_telegram_group", "support_welcome_message",
             // 积分
             "points_enabled", "points_rate",
             // 维护模式
@@ -113,6 +115,12 @@ public class SiteConfigServiceImpl implements SiteConfigService {
             if (key == null || !EDITABLE_KEYS.contains(key)) {
                 log.warn("Rejected config update for non-editable key: {}", key);
                 continue;
+            }
+            if ("support_welcome_message".equals(key)) {
+                if (value == null || value.length() > 500) {
+                    throw new BusinessException(ErrorCode.BAD_REQUEST, "客服欢迎语不能超过 500 字");
+                }
+                value = value.trim();
             }
             // F15: custom_css 写入时也做安全过滤
             if ("custom_css".equals(key) && value != null) {

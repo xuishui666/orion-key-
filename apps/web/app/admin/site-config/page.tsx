@@ -9,6 +9,8 @@ import { mockSiteConfigKVs } from "@/lib/mock-data"
 import { useLocale } from "@/lib/context"
 import type { SiteConfigKV } from "@/types"
 
+const DEFAULT_WELCOME_MESSAGE = "您好，请描述遇到的问题，客服收到后会尽快回复。"
+
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml"]
 const ALLOWED_IMAGE_ACCEPT = ".jpg,.jpeg,.png,.gif,.webp,.bmp,.svg"
 
@@ -439,6 +441,17 @@ export default function AdminSiteConfigPage() {
                 onChange={(e) => setValue("contact_telegram_group", e.target.value)}
               />
               <p className="text-xs text-muted-foreground">{t("admin.contactTelegramGroupHint")}</p>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="support-welcome-message" className="text-sm font-medium text-foreground">客服欢迎语</label>
+              <textarea
+                id="support-welcome-message"
+                className="min-h-24 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                value={configMap.support_welcome_message ?? DEFAULT_WELCOME_MESSAGE}
+                onChange={(e) => setValue("support_welcome_message", e.target.value)}
+                maxLength={500}
+              />
+              <p className="text-xs text-muted-foreground">访客打开客服窗口时显示；留空关闭自动欢迎。</p>
             </div>
             <button
               type="button"
