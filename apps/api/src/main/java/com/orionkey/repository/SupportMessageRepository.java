@@ -23,5 +23,8 @@ public interface SupportMessageRepository extends JpaRepository<SupportMessage, 
 
     Optional<SupportMessage> findByTelegramMessageId(Long messageId);
 
+    Optional<SupportMessage> findTopByConversationIdAndSenderAndTelegramMessageIdIsNotNullOrderByCreatedAtDesc(
+            UUID conversationId, SupportMessage.Sender sender);
+
     boolean existsByTelegramUpdateId(Long updateId);
 }

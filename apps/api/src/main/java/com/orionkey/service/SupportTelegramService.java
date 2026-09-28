@@ -1,6 +1,7 @@
 package com.orionkey.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.orionkey.entity.SupportMessage;
 import com.orionkey.repository.SupportConversationRepository;
 import com.orionkey.repository.SupportMessageRepository;
@@ -19,7 +20,9 @@ import org.springframework.web.client.RestTemplate;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Slf4j
@@ -27,6 +30,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SupportTelegramService {
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
     private final SupportMessageRepository messages;
     private final SupportConversationRepository conversations;
     private final SupportService supportService;
@@ -77,11 +81,23 @@ public class SupportTelegramService {
                         SupportMessage.Sender.CUSTOMER, LocalDateTime.now());
         for (SupportMessage message : pending) {
             try {
-                String prefix = conversations.findById(message.getConversationId())
-                        .map(c -> c.getOrderReference() == null ? "新客服消息" : "订单 " + c.getOrderReference() + " 的客服消息")
-                        .orElse("新客服消息");
-                String notice = prefix + "\n\n" + message.getText().substring(0, Math.min(300, message.getText().length()))
+                String conversationId = message.getConversationId().toString().replace("-", "")
+                        .substring(0, 12).toUpperCase(Locale.ROOT);
+                StringBuilder header = new StringBuilder("客服会话 #").append(conversationId);
+                conversations.findById(message.getConversationId()).ifPresent(c -> {
+                    if (c.getOrderReference() != null && !c.getOrderReference().isBlank())
+                        header.append("\n订单：").append(c.getOrderReference().replaceAll("[\\p{Cntrl}]", " "));
+                    if (c.getEmail() != null && !c.getEmail().isBlank())
+                        header.append("\n邮箱：").append(c.getEmail().replaceAll("[\\p{Cntrl}]", " "));
+                });
+                String notice = header + "\n\n" + message.getText().substring(0, Math.min(300, message.getText().length()))
                         + "\n\n请直接回复这条消息";
+                Long previousId = messages
+                        .findTopByConversationIdAndSenderAndTelegramMessageIdIsNotNullOrderByCreatedAtDesc(
+                                message.getConversationId(), SupportMessage.Sender.CUSTOMER)
+                        .map(SupportMessage::getTelegramMessageId).orElse(null);
+                Map<String, Object> replyParameters = previousId == null ? null : Map.of(
+                        "message_id", previousId, "allow_sending_without_reply", true);
                 JsonNode response;
                 if (message.isHasImage()) {
                     var image = supportService.notificationImageData(message);
@@ -89,6 +105,8 @@ public class SupportTelegramService {
                     var form = new LinkedMultiValueMap<String, Object>();
                     form.add("chat_id", chatId);
                     form.add("caption", notice);
+                    if (replyParameters != null)
+                        form.add("reply_parameters", objectMapper.writeValueAsString(replyParameters));
                     HttpHeaders headers = new HttpHeaders();
                     headers.setContentType(MediaType.parseMediaType(image.contentType()));
                     String filename = webp ? "image.webp" : "image." + ("image/png".equals(image.contentType()) ? "png" : "jpg");
@@ -97,8 +115,11 @@ public class SupportTelegramService {
                     }, headers));
                     response = restTemplate.postForObject(api(webp ? "sendDocument" : "sendPhoto"), form, JsonNode.class);
                 } else {
-                    response = restTemplate.postForObject(api("sendMessage"), Map.of(
-                            "chat_id", chatId, "text", notice), JsonNode.class);
+                    var body = new HashMap<String, Object>();
+                    body.put("chat_id", chatId);
+                    body.put("text", notice);
+                    if (replyParameters != null) body.put("reply_parameters", replyParameters);
+                    response = restTemplate.postForObject(api("sendMessage"), body, JsonNode.class);
                 }
                 if (response == null || !response.path("ok").asBoolean(false)
                         || !response.path("result").path("message_id").canConvertToLong()) {

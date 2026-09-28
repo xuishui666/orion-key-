@@ -7,13 +7,17 @@ import com.orionkey.repository.SupportConversationRepository;
 import com.orionkey.repository.SupportMessageRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
@@ -24,7 +28,7 @@ class SupportTelegramServiceTest {
     private final SupportConversationRepository conversations = mock(SupportConversationRepository.class);
     private final RestTemplate restTemplate = mock(RestTemplate.class);
     private final SupportTelegramService telegram = new SupportTelegramService(
-            restTemplate, messages, conversations, support);
+            restTemplate, new ObjectMapper(), messages, conversations, support);
     private final ObjectMapper json = new ObjectMapper();
 
     private void configure() {
@@ -40,6 +44,7 @@ class SupportTelegramServiceTest {
         assertTrue(telegram.validSecret("private-secret"));
         assertFalse(telegram.validSecret("wrong-secret"));
         when(support.telegramReply(42L, 7L, "reply")).thenReturn(true);
+        when(support.telegramReply(43L, 9L, "other")).thenReturn(true);
         telegram.acceptUpdate(json.readTree("""
                 {"update_id":7,"message":{"chat":{"id":123},"from":{"id":123},
                  "reply_to_message":{"message_id":42},"text":"reply"}}
@@ -48,7 +53,12 @@ class SupportTelegramServiceTest {
                 {"update_id":8,"message":{"chat":{"id":123},"from":{"id":999},
                  "reply_to_message":{"message_id":42},"text":"spoof"}}
                 """));
+        telegram.acceptUpdate(json.readTree("""
+                {"update_id":9,"message":{"chat":{"id":123},"from":{"id":123},
+                 "reply_to_message":{"message_id":43},"text":"other"}}
+                """));
         verify(support).telegramReply(42L, 7L, "reply");
+        verify(support).telegramReply(43L, 9L, "other");
         verifyNoMoreInteractions(support);
     }
 
@@ -64,7 +74,13 @@ class SupportTelegramServiceTest {
         message.setHasImage(true);
         when(messages.findTop10BySenderAndTelegramMessageIdIsNullAndNextNotifyAtBeforeOrderByCreatedAtAsc(
                 eq(SupportMessage.Sender.CUSTOMER), any(LocalDateTime.class))).thenReturn(List.of(message));
-        when(conversations.findById(message.getConversationId())).thenReturn(Optional.of(new SupportConversation()));
+        SupportConversation conversation = new SupportConversation();
+        conversation.setEmail("buyer@example.com");
+        when(conversations.findById(message.getConversationId())).thenReturn(Optional.of(conversation));
+        SupportMessage previous = new SupportMessage();
+        previous.setTelegramMessageId(98L);
+        when(messages.findTopByConversationIdAndSenderAndTelegramMessageIdIsNotNullOrderByCreatedAtDesc(
+                message.getConversationId(), SupportMessage.Sender.CUSTOMER)).thenReturn(Optional.of(previous));
         when(support.notificationImageData(message)).thenReturn(new SupportService.ImageData("image/png", new byte[]{1, 2, 3}));
         when(restTemplate.postForObject(contains("/sendPhoto"), any(), eq(com.fasterxml.jackson.databind.JsonNode.class)))
                 .thenReturn(json.readTree("{\"ok\":true,\"result\":{\"message_id\":99}}"));
@@ -73,5 +89,52 @@ class SupportTelegramServiceTest {
 
         assertTrue(message.getTelegramMessageId() == 99L);
         verify(messages).save(message);
+        var form = org.mockito.ArgumentCaptor.forClass(MultiValueMap.class);
+        verify(restTemplate).postForObject(contains("/sendPhoto"), form.capture(), eq(com.fasterxml.jackson.databind.JsonNode.class));
+        assertTrue(form.getValue().getFirst("caption").toString().contains("客服会话 #"));
+        assertTrue(form.getValue().getFirst("caption").toString().contains("buyer@example.com"));
+        assertEquals(98, json.readTree(form.getValue().getFirst("reply_parameters").toString())
+                .path("message_id").asInt());
+    }
+
+    @Test
+    void keepsInterleavedConversationsDistinct() throws Exception {
+        configure();
+        ReflectionTestUtils.setField(telegram, "webhookReady", true);
+        UUID firstId = UUID.randomUUID();
+        UUID secondId = UUID.randomUUID();
+        SupportMessage first = customerMessage(firstId, "first");
+        SupportMessage second = customerMessage(secondId, "second");
+        SupportMessage next = customerMessage(firstId, "next");
+        when(messages.findTop10BySenderAndTelegramMessageIdIsNullAndNextNotifyAtBeforeOrderByCreatedAtAsc(
+                eq(SupportMessage.Sender.CUSTOMER), any(LocalDateTime.class)))
+                .thenReturn(List.of(first, second, next));
+        when(conversations.findById(any())).thenReturn(Optional.of(new SupportConversation()));
+        when(messages.findTopByConversationIdAndSenderAndTelegramMessageIdIsNotNullOrderByCreatedAtDesc(
+                eq(firstId), eq(SupportMessage.Sender.CUSTOMER)))
+                .thenReturn(Optional.empty(), Optional.of(first));
+        when(restTemplate.postForObject(contains("/sendMessage"), any(), eq(com.fasterxml.jackson.databind.JsonNode.class)))
+                .thenReturn(json.readTree("{\"ok\":true,\"result\":{\"message_id\":101}}"),
+                        json.readTree("{\"ok\":true,\"result\":{\"message_id\":102}}"),
+                        json.readTree("{\"ok\":true,\"result\":{\"message_id\":103}}"));
+
+        telegram.sendPendingNotifications();
+
+        var body = org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(restTemplate, times(3)).postForObject(contains("/sendMessage"), body.capture(), eq(com.fasterxml.jackson.databind.JsonNode.class));
+        assertTrue(body.getAllValues().get(0).get("text").toString().contains(firstId.toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT)));
+        assertTrue(body.getAllValues().get(1).get("text").toString().contains(secondId.toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT)));
+        assertEquals(null, body.getAllValues().get(0).get("reply_parameters"));
+        assertEquals(body.getAllValues().get(2).get("reply_parameters"),
+                Map.of("message_id", 101L, "allow_sending_without_reply", true));
+    }
+
+    private SupportMessage customerMessage(UUID conversationId, String text) {
+        SupportMessage message = new SupportMessage();
+        message.setId(UUID.randomUUID());
+        message.setConversationId(conversationId);
+        message.setSender(SupportMessage.Sender.CUSTOMER);
+        message.setText(text);
+        return message;
     }
 }
