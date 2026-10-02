@@ -2,7 +2,9 @@ package com.orionkey.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.orionkey.constant.ErrorCode;
 import com.orionkey.entity.SupportMessage;
+import com.orionkey.exception.BusinessException;
 import com.orionkey.repository.SupportConversationRepository;
 import com.orionkey.repository.SupportMessageRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,13 +13,16 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
+import java.net.URI;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -144,11 +149,37 @@ public class SupportTelegramService {
         JsonNode replyId = telegramMessage.path("reply_to_message").path("message_id");
         JsonNode updateId = update.path("update_id");
         JsonNode text = telegramMessage.path("text");
-        if (!text.isTextual() || !updateId.canConvertToLong()) return;
+        if (!updateId.canConvertToLong()) return;
         if (!replyId.canConvertToLong()) {
             explainReply(telegramMessage, "请直接回复一条客服通知，以便找到对应的访客会话。");
             return;
         }
+        JsonNode photos = telegramMessage.path("photo");
+        JsonNode document = telegramMessage.path("document");
+        JsonNode image = photos.isArray() && photos.size() > 0 ? photos.get(photos.size() - 1)
+                : document.path("mime_type").asText().matches("image/(jpeg|png|webp)") ? document : null;
+        if (image != null) {
+            try {
+                long size = image.path("file_size").asLong(0);
+                if (size > SupportService.MAX_IMAGE_BYTES) {
+                    explainReply(telegramMessage, "图片大小须在 3 MB 以内。");
+                    return;
+                }
+                byte[] data = downloadImage(image.path("file_id").asText());
+                if (!supportService.telegramImageReply(replyId.asLong(), updateId.asLong(),
+                        telegramMessage.path("caption").asText(), data)) {
+                    explainReply(telegramMessage, "找不到对应的客服通知，请回复最近一条通知。");
+                }
+            } catch (BusinessException e) {
+                explainReply(telegramMessage, e.getMessage());
+            }
+            return;
+        }
+        if (!document.isMissingNode()) {
+            explainReply(telegramMessage, "仅支持 3 MB 以内的 JPG、PNG、WebP 图片。");
+            return;
+        }
+        if (!text.isTextual()) return;
         String reply = text.asText().trim();
         if (reply.isEmpty() || reply.length() > 2000) {
             explainReply(telegramMessage, "回复内容需为 1 到 2000 字。");
@@ -157,6 +188,36 @@ public class SupportTelegramService {
         if (!supportService.telegramReply(replyId.asLong(), updateId.asLong(), reply)) {
             explainReply(telegramMessage, "找不到对应的客服通知，请回复最近一条通知。");
         }
+    }
+
+    private byte[] downloadImage(String fileId) {
+        if (fileId.isBlank()) throw new IllegalArgumentException("Missing Telegram file id");
+        JsonNode response;
+        try {
+            response = restTemplate.postForObject(api("getFile"), Map.of("file_id", fileId), JsonNode.class);
+        } catch (RestClientException e) {
+            throw new IllegalStateException("Telegram getFile failed");
+        }
+        if (response == null || !response.path("ok").asBoolean(false)) {
+            throw new IllegalStateException("Telegram getFile failed");
+        }
+        JsonNode file = response.path("result");
+        if (file.path("file_size").asLong(0) > SupportService.MAX_IMAGE_BYTES) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "图片大小须在 3 MB 以内");
+        }
+        String path = file.path("file_path").asText();
+        if (!path.matches("[A-Za-z0-9_./-]+") || path.contains("..")) {
+            throw new IllegalStateException("Invalid Telegram file path");
+        }
+        byte[] data;
+        try {
+            data = restTemplate.execute(URI.create("https://api.telegram.org/file/bot" + botToken + "/" + path),
+                    HttpMethod.GET, null, result -> result.getBody().readNBytes(SupportService.MAX_IMAGE_BYTES + 1));
+        } catch (RestClientException e) {
+            throw new IllegalStateException("Telegram file download failed");
+        }
+        if (data == null) throw new IllegalStateException("Telegram file download failed");
+        return data;
     }
 
     private void explainReply(JsonNode message, String reason) {

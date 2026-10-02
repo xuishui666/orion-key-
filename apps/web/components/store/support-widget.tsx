@@ -139,6 +139,7 @@ export function SupportWidget() {
               <div key={message.id} className={message.sender === "CUSTOMER" ? "flex justify-end" : "flex justify-start"}>
                 <div className={`max-w-[85%] whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-sm ${message.sender === "CUSTOMER" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>
                   {message.has_image && conversation && session && <SupportImage conversationId={conversation.id} messageId={message.id} token={session.token} />}
+                  {message.has_image && message.text !== "[图片]" && <p>{message.text}</p>}
                   {!message.has_image && message.text}
                 </div>
               </div>

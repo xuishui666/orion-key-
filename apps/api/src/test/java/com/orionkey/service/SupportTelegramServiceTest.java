@@ -7,9 +7,12 @@ import com.orionkey.repository.SupportConversationRepository;
 import com.orionkey.repository.SupportMessageRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.http.HttpMethod;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.ResponseExtractor;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -60,6 +63,53 @@ class SupportTelegramServiceTest {
         verify(support).telegramReply(42L, 7L, "reply");
         verify(support).telegramReply(43L, 9L, "other");
         verifyNoMoreInteractions(support);
+    }
+
+    @Test
+    void routesPhotoRepliesAndRejectsOversizedImages() throws Exception {
+        configure();
+        byte[] png = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+        when(restTemplate.postForObject(contains("/getFile"), any(), eq(com.fasterxml.jackson.databind.JsonNode.class)))
+                .thenReturn(json.readTree("{\"ok\":true,\"result\":{\"file_path\":\"photos/test.png\",\"file_size\":8}}"));
+        when(restTemplate.execute(any(URI.class), eq(HttpMethod.GET), isNull(), any(ResponseExtractor.class)))
+                .thenReturn(png);
+        when(support.telegramImageReply(eq(42L), eq(7L), eq("caption"), any(byte[].class))).thenReturn(true);
+
+        telegram.acceptUpdate(json.readTree("""
+                {"update_id":7,"message":{"chat":{"id":123},"from":{"id":123},
+                 "reply_to_message":{"message_id":42},"photo":[{"file_id":"small","file_size":4},
+                 {"file_id":"large","file_size":8}],"caption":"caption"}}
+                """));
+        verify(support).telegramImageReply(42L, 7L, "caption", png);
+
+        telegram.acceptUpdate(json.readTree("""
+                {"update_id":8,"message":{"chat":{"id":123},"from":{"id":999},
+                 "reply_to_message":{"message_id":42},"photo":[{"file_id":"large","file_size":8}]}}
+                """));
+        telegram.acceptUpdate(json.readTree("""
+                {"update_id":9,"message":{"chat":{"id":123},"from":{"id":123},
+                 "reply_to_message":{"message_id":42},"photo":[{"file_id":"huge","file_size":4000000}]}}
+                """));
+        verify(support, times(1)).telegramImageReply(anyLong(), anyLong(), anyString(), any());
+        verify(restTemplate, times(1)).execute(any(URI.class), eq(HttpMethod.GET), isNull(), any(ResponseExtractor.class));
+    }
+
+    @Test
+    void routesImageDocumentsToTheRepliedConversation() throws Exception {
+        configure();
+        byte[] png = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+        when(restTemplate.postForObject(contains("/getFile"), any(), eq(com.fasterxml.jackson.databind.JsonNode.class)))
+                .thenReturn(json.readTree("{\"ok\":true,\"result\":{\"file_path\":\"documents/test.png\"}}"));
+        when(restTemplate.execute(any(URI.class), eq(HttpMethod.GET), isNull(), any(ResponseExtractor.class)))
+                .thenReturn(png);
+        when(support.telegramImageReply(eq(44L), eq(10L), eq(""), any(byte[].class))).thenReturn(true);
+
+        telegram.acceptUpdate(json.readTree("""
+                {"update_id":10,"message":{"chat":{"id":123},"from":{"id":123},
+                 "reply_to_message":{"message_id":44},
+                 "document":{"file_id":"document-id","mime_type":"image/png"}}}
+                """));
+        verify(support).telegramImageReply(44L, 10L, "", png);
     }
 
     @Test

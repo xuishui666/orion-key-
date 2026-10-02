@@ -30,6 +30,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SupportService {
     private static final SecureRandom RANDOM = new SecureRandom();
+    public static final int MAX_IMAGE_BYTES = 3 * 1024 * 1024;
     private final SupportConversationRepository conversations;
     private final SupportMessageRepository messages;
     private final SupportImageRepository images;
@@ -75,7 +76,7 @@ public class SupportService {
     public MessageView customerImage(UUID id, String token, MultipartFile file) {
         SupportConversation conversation = find(id);
         authorize(conversation, token);
-        if (file == null || file.isEmpty() || file.getSize() > 3 * 1024 * 1024) {
+        if (file == null || file.isEmpty() || file.getSize() > MAX_IMAGE_BYTES) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "图片大小须在 3 MB 以内");
         }
         byte[] data;
@@ -88,15 +89,7 @@ public class SupportService {
         if (contentType == null || !contentType.equals(file.getContentType())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "仅支持 JPG、PNG、WebP 图片");
         }
-        MessageView view = saveMessage(conversation, SupportMessage.Sender.CUSTOMER, "[图片]", null);
-        SupportMessage message = messages.getReferenceById(view.id());
-        message.setHasImage(true);
-        SupportImage image = new SupportImage();
-        image.setMessageId(view.id());
-        image.setContentType(contentType);
-        image.setData(data);
-        images.save(image);
-        return new MessageView(view.id(), view.sender(), view.text(), true, view.createdAt());
+        return saveImage(conversation, SupportMessage.Sender.CUSTOMER, "[图片]", null, contentType, data);
     }
 
     @Transactional(readOnly = true)
@@ -159,6 +152,35 @@ public class SupportService {
         if (original == null || original.getSender() != SupportMessage.Sender.CUSTOMER) return false;
         saveMessage(find(original.getConversationId()), SupportMessage.Sender.ADMIN, text, updateId);
         return true;
+    }
+
+    @Transactional
+    public boolean telegramImageReply(long repliedMessageId, long updateId, String caption, byte[] data) {
+        if (messages.existsByTelegramUpdateId(updateId)) return true;
+        SupportMessage original = messages.findByTelegramMessageId(repliedMessageId).orElse(null);
+        if (original == null || original.getSender() != SupportMessage.Sender.CUSTOMER) return false;
+        if (data == null || data.length == 0 || data.length > MAX_IMAGE_BYTES) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "图片大小须在 3 MB 以内");
+        }
+        String contentType = imageType(data);
+        if (contentType == null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "仅支持 JPG、PNG、WebP 图片");
+        }
+        String text = caption == null || caption.isBlank() ? "[图片]" : caption.trim();
+        saveImage(find(original.getConversationId()), SupportMessage.Sender.ADMIN, text, updateId, contentType, data);
+        return true;
+    }
+
+    private MessageView saveImage(SupportConversation conversation, SupportMessage.Sender sender,
+                                  String text, Long updateId, String contentType, byte[] data) {
+        MessageView view = saveMessage(conversation, sender, text, updateId);
+        messages.getReferenceById(view.id()).setHasImage(true);
+        SupportImage image = new SupportImage();
+        image.setMessageId(view.id());
+        image.setContentType(contentType);
+        image.setData(data);
+        images.save(image);
+        return new MessageView(view.id(), view.sender(), view.text(), true, view.createdAt());
     }
 
     private MessageView saveMessage(SupportConversation conversation, SupportMessage.Sender sender,

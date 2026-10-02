@@ -81,6 +81,7 @@ export default function AdminSupportPage() {
                   <div key={message.id} className={message.sender === "ADMIN" ? "flex justify-end" : "flex justify-start"}>
                     <div className={`max-w-[85%] whitespace-pre-wrap break-words rounded-md px-3 py-2 text-sm ${message.sender === "ADMIN" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
                       {message.has_image && <SupportImage conversationId={conversation.id} messageId={message.id} />}
+                      {message.has_image && message.text !== "[图片]" && <p>{message.text}</p>}
                       {!message.has_image && message.text}
                     </div>
                   </div>

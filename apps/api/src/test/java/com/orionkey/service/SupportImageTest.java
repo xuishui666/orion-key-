@@ -67,4 +67,39 @@ class SupportImageTest {
         assertArrayEquals(png, service.customerImageData(conversationId, messageId, token).data());
         assertThrows(BusinessException.class, () -> service.customerImageData(conversationId, messageId, "wrong"));
     }
+
+    @Test
+    void telegramImageReplyUsesOriginalConversationAndIsIdempotent() {
+        UUID conversationId = UUID.randomUUID();
+        UUID messageId = UUID.randomUUID();
+        SupportConversation conversation = new SupportConversation();
+        conversation.setId(conversationId);
+        SupportMessage original = new SupportMessage();
+        original.setConversationId(conversationId);
+        original.setSender(SupportMessage.Sender.CUSTOMER);
+        when(messages.findByTelegramMessageId(42L)).thenReturn(Optional.of(original));
+        when(conversations.findById(conversationId)).thenReturn(Optional.of(conversation));
+        when(messages.saveAndFlush(any())).thenAnswer(invocation -> {
+            SupportMessage message = invocation.getArgument(0);
+            message.setId(messageId);
+            message.setCreatedAt(LocalDateTime.now());
+            return message;
+        });
+        SupportMessage stored = new SupportMessage();
+        when(messages.getReferenceById(messageId)).thenReturn(stored);
+        byte[] png = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+
+        assertTrue(service.telegramImageReply(42L, 7L, "answer", png));
+        verify(messages).saveAndFlush(argThat(message -> message.getConversationId().equals(conversationId)
+                && message.getSender() == SupportMessage.Sender.ADMIN && message.getTelegramUpdateId() == 7L
+                && message.getText().equals("answer")));
+        verify(images).save(argThat(image -> image.getMessageId().equals(messageId)
+                && image.getContentType().equals("image/png")));
+        assertTrue(stored.isHasImage());
+
+        when(messages.existsByTelegramUpdateId(7L)).thenReturn(true);
+        assertTrue(service.telegramImageReply(42L, 7L, "answer", png));
+        verify(images, times(1)).save(any());
+        assertThrows(BusinessException.class, () -> service.telegramImageReply(42L, 8L, "", new byte[]{1, 2, 3}));
+    }
 }
