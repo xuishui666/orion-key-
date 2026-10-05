@@ -46,6 +46,11 @@ export default async function HomePage() {
         categories={categories}
         siteSlogan={config?.site_slogan || ""}
         siteDescription={config?.site_description || ""}
+        noticeTitle={config?.home_notice_title}
+        noticeBody={config?.home_notice_body}
+        noticeFont={config?.home_notice_font}
+        noticeSize={config?.home_notice_size}
+        noticeColor={config?.home_notice_color}
       />
     </>
   )

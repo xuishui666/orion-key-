@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { Save, AlertTriangle, Upload, Loader2, ImagePlus } from "lucide-react"
+import { Save, AlertTriangle, Upload, Loader2, ImagePlus, Bold, Link2 } from "lucide-react"
+import { HomeAnnouncement } from "@/components/store/home-announcement"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { adminConfigApi, adminProductApi, withMockFallback } from "@/services/api"
@@ -35,6 +36,7 @@ export default function AdminSiteConfigPage() {
   const [logoUploading, setLogoUploading] = useState(false)
   const [popupUploading, setPopupUploading] = useState(false)
   const popupTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const noticeTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   const fetchConfig = useCallback(async () => {
     setLoading(true)
@@ -64,6 +66,33 @@ export default function AdminSiteConfigPage() {
   const getBool = (key: string) => configMap[key] === "true"
   const toggleBool = (key: string) => {
     setConfigMap(prev => ({ ...prev, [key]: prev[key] === "true" ? "false" : "true" }))
+  }
+
+  const insertNoticeMarkup = (before: string, after: string, fallback: string) => {
+    const textarea = noticeTextareaRef.current
+    const current = getValue("home_notice_body")
+    const start = textarea?.selectionStart ?? current.length
+    const end = textarea?.selectionEnd ?? current.length
+    const selected = current.slice(start, end) || fallback
+    const next = current.slice(0, start) + before + selected + after + current.slice(end)
+    if (next.length > 3000) { toast.error("公告正文不能超过 3000 字"); return }
+    setValue("home_notice_body", next)
+    requestAnimationFrame(() => {
+      textarea?.focus()
+      textarea?.setSelectionRange(start + before.length, start + before.length + selected.length)
+    })
+  }
+
+  const insertNoticeLink = () => {
+    const input = window.prompt("输入链接地址", "https://")
+    if (!input) return
+    try {
+      const url = new URL(input)
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error()
+      insertNoticeMarkup("[", `](${url.toString()})`, "链接文字")
+    } catch {
+      toast.error("请输入有效的 HTTP 或 HTTPS 链接")
+    }
   }
 
   const handleSave = async () => {
@@ -252,7 +281,67 @@ export default function AdminSiteConfigPage() {
       {/* Announcement */}
       {tab === "announcement" && (
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <div className="flex flex-col gap-5 max-w-xl">
+          <div className="flex flex-col gap-5 max-w-3xl">
+            <div className="border-b border-border pb-5">
+              <h2 className="text-base font-semibold text-foreground">首页公告</h2>
+              <div className="mt-4 flex flex-col gap-4">
+                <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+                  标题
+                  <input type="text" maxLength={80} value={getValue("home_notice_title")}
+                    placeholder={getValue("site_slogan") || "公告标题"}
+                    onChange={e => setValue("home_notice_title", e.target.value)}
+                    className="h-10 rounded-md border border-input bg-background px-3 text-sm" />
+                </label>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="home-notice-body" className="text-sm font-medium text-foreground">正文</label>
+                  <div className="flex gap-1" aria-label="正文格式">
+                    <button type="button" onClick={() => insertNoticeMarkup("**", "**", "加粗文字")}
+                      title="加粗选中文字" aria-label="加粗选中文字"
+                      className="flex h-8 w-8 items-center justify-center rounded border border-input hover:bg-accent"><Bold className="h-4 w-4" /></button>
+                    <button type="button" onClick={insertNoticeLink}
+                      title="插入链接" aria-label="插入链接"
+                      className="flex h-8 w-8 items-center justify-center rounded border border-input hover:bg-accent"><Link2 className="h-4 w-4" /></button>
+                  </div>
+                  <textarea id="home-notice-body" ref={noticeTextareaRef} maxLength={3000} rows={5}
+                    value={getValue("home_notice_body")}
+                    placeholder={getValue("site_description") || "输入公告正文"}
+                    onChange={e => setValue("home_notice_body", e.target.value)}
+                    className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm" />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+                    字体
+                    <select value={getValue("home_notice_font") || "sans"}
+                      onChange={e => setValue("home_notice_font", e.target.value)}
+                      className="h-10 rounded-md border border-input bg-background px-3 text-sm">
+                      <option value="sans">无衬线</option><option value="serif">衬线</option><option value="mono">等宽</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+                    字号 (px)
+                    <input type="number" min={14} max={22} value={getValue("home_notice_size") || "16"}
+                      onChange={e => setValue("home_notice_size", e.target.value)}
+                      onBlur={() => setValue("home_notice_size", String(Math.min(22, Math.max(14, Math.round(Number(getValue("home_notice_size")) || 16)))))}
+                      className="h-10 rounded-md border border-input bg-background px-3 text-sm" />
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+                    文字颜色
+                    <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(getValue("home_notice_color")) ? getValue("home_notice_color") : "#0f766e"}
+                      onChange={e => setValue("home_notice_color", e.target.value)}
+                      className="h-10 w-full cursor-pointer rounded-md border border-input bg-background p-1" />
+                  </label>
+                </div>
+                <div className="overflow-hidden rounded-md border border-border">
+                  <HomeAnnouncement
+                    title={configMap.home_notice_title ?? getValue("site_slogan")}
+                    body={configMap.home_notice_body ?? getValue("site_description")}
+                    font={getValue("home_notice_font")}
+                    size={getValue("home_notice_size")}
+                    color={getValue("home_notice_color")}
+                  />
+                </div>
+              </div>
+            </div>
             {/* ① 顶栏滚动公告开关 */}
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium text-foreground">{t("admin.enableAnnouncement")}</label>

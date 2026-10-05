@@ -28,6 +28,7 @@ public class SiteConfigServiceImpl implements SiteConfigService {
     private static final List<String> PUBLIC_KEYS = List.of(
             "site_name", "site_slogan", "site_description", "logo_url", "favicon_url",
             "announcement_enabled", "announcement", "popup_enabled", "popup_content",
+            "home_notice_title", "home_notice_body", "home_notice_font", "home_notice_size", "home_notice_color",
             "contact_email", "contact_telegram", "contact_telegram_group", "support_welcome_message", "points_enabled", "points_rate",
             "maintenance_enabled", "maintenance_message", "footer_text", "github_url", "custom_css"
     );
@@ -38,6 +39,7 @@ public class SiteConfigServiceImpl implements SiteConfigService {
             "site_name", "site_slogan", "site_description", "logo_url", "favicon_url",
             // 公告 / 弹窗
             "announcement_enabled", "announcement", "popup_enabled", "popup_content",
+            "home_notice_title", "home_notice_body", "home_notice_font", "home_notice_size", "home_notice_color",
             // 联系方式
             "contact_email", "contact_telegram", "contact_telegram_group", "support_welcome_message",
             // 积分
@@ -122,6 +124,21 @@ public class SiteConfigServiceImpl implements SiteConfigService {
                 }
                 value = value.trim();
             }
+            if ("home_notice_title".equals(key) && (value == null || value.length() > 80)) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "首页公告标题不能超过 80 字");
+            }
+            if ("home_notice_body".equals(key) && (value == null || value.length() > 3000)) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "首页公告正文不能超过 3000 字");
+            }
+            if ("home_notice_font".equals(key) && !Set.of("sans", "serif", "mono").contains(value)) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "首页公告字体无效");
+            }
+            if ("home_notice_size".equals(key) && (value == null || !value.matches("1[4-9]|2[0-2]"))) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "首页公告字号无效");
+            }
+            if ("home_notice_color".equals(key) && (value == null || !value.matches("#[0-9a-fA-F]{6}"))) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "首页公告颜色无效");
+            }
             // F15: custom_css 写入时也做安全过滤
             if ("custom_css".equals(key) && value != null) {
                 value = sanitizeCss(value);
@@ -130,6 +147,7 @@ public class SiteConfigServiceImpl implements SiteConfigService {
                     .orElseGet(() -> {
                         SiteConfig c = new SiteConfig();
                         c.setConfigKey(key);
+                        if (key.startsWith("home_notice_")) c.setConfigGroup("announcement");
                         return c;
                     });
             config.setConfigValue(value);

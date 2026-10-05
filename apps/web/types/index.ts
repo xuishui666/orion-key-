@@ -274,6 +274,11 @@ export interface SiteConfig {
   favicon_url?: string
   announcement_enabled: boolean
   announcement?: string
+  home_notice_title?: string
+  home_notice_body?: string
+  home_notice_font?: string
+  home_notice_size?: string
+  home_notice_color?: string
   popup_enabled: boolean
   popup_content?: string
   contact_email?: string

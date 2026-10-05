@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import { useLocale, useSearch, useSiteConfig } from "@/lib/context"
 import { ProductCard } from "@/components/store/product-card"
+import { HomeAnnouncement } from "@/components/store/home-announcement"
 import { cn } from "@/lib/utils"
 import type { ProductCard as ProductCardType, Category } from "@/types"
 
@@ -18,9 +19,15 @@ interface HomeContentProps {
   categories: Category[]
   siteSlogan: string
   siteDescription: string
+  noticeTitle?: string
+  noticeBody?: string
+  noticeFont?: string
+  noticeSize?: string
+  noticeColor?: string
 }
 
-export function HomeContent({ products, categories, siteSlogan, siteDescription }: HomeContentProps) {
+export function HomeContent({ products, categories, siteSlogan, siteDescription,
+  noticeTitle, noticeBody, noticeFont, noticeSize, noticeColor }: HomeContentProps) {
   const { t } = useLocale()
   const { config } = useSiteConfig()
   const { searchQuery, sortBy, inStockOnly, priceMin, priceMax } = useSearch()
@@ -76,33 +83,15 @@ export function HomeContent({ products, categories, siteSlogan, siteDescription 
 
   return (
     <div className="mx-auto w-full max-w-7xl 2xl:max-w-[1600px] flex flex-col gap-6">
-      {/* Hero */}
-      <section className="relative overflow-hidden rounded-xl border border-border/60 bg-card px-5 py-5 sm:px-8 sm:py-6">
-        {/* Subtle radial glow behind text */}
-        <div className="scheme-blob pointer-events-none absolute -left-10 -top-10 h-48 w-64 rounded-full blur-3xl" />
-        <div className="scheme-blob pointer-events-none absolute -right-16 bottom-0 h-32 w-48 rounded-full blur-3xl opacity-60" />
-        <div className="relative">
-          <h1 className="text-balance text-2xl font-extrabold tracking-tight sm:text-3xl">
-            <span className="scheme-gradient-text">
-              {siteSlogan}
-            </span>
-          </h1>
-          <p className="mt-3 text-sm text-muted-foreground">
-            {siteDescription}
-          </p>
-          {config?.contact_telegram_group && (
-            <a
-              href={config.contact_telegram_group}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="tg-ghost-btn mt-6 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold text-[#2AABEE] transition-all active:scale-[0.97]"
-            >
-              <img src="/images/telegram.png" alt="" className="h-4 w-4" />
-              <span>{t("home.joinTelegram")}</span>
-            </a>
-          )}
-        </div>
-      </section>
+      <HomeAnnouncement
+        title={noticeTitle ?? siteSlogan}
+        body={noticeBody ?? siteDescription}
+        font={noticeFont}
+        size={noticeSize}
+        color={noticeColor}
+        groupUrl={config?.contact_telegram_group}
+        groupLabel={t("home.joinTelegram")}
+      />
 
       {/* Controls */}
       <div className="flex flex-col gap-5">
