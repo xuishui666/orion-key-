@@ -268,8 +268,6 @@ export interface PaymentChannelItem {
 
 export interface SiteConfig {
   site_name: string
-  site_slogan?: string
-  site_description?: string
   logo_url?: string
   favicon_url?: string
   announcement_enabled: boolean

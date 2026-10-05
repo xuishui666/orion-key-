@@ -187,26 +187,6 @@ export default function AdminSiteConfigPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">{t("admin.siteSlogan")}</label>
-              <input
-                type="text"
-                className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                value={getValue("site_slogan")}
-                onChange={(e) => setValue("site_slogan", e.target.value)}
-                placeholder="Unlock Your AI Potential"
-              />
-              <p className="text-xs text-muted-foreground">{t("admin.siteSloganHint")}</p>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">{t("admin.siteDesc")}</label>
-              <textarea
-                className="min-h-20 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                value={getValue("site_description")}
-                onChange={(e) => setValue("site_description", e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">{t("admin.siteDescHint")}</p>
-            </div>
-            <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-foreground">{t("admin.logoUrl")}</label>
               <div className="flex gap-2">
                 <input
@@ -288,7 +268,7 @@ export default function AdminSiteConfigPage() {
                 <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
                   标题
                   <input type="text" maxLength={80} value={getValue("home_notice_title")}
-                    placeholder={getValue("site_slogan") || "公告标题"}
+                    placeholder="公告标题"
                     onChange={e => setValue("home_notice_title", e.target.value)}
                     className="h-10 rounded-md border border-input bg-background px-3 text-sm" />
                 </label>
@@ -304,7 +284,7 @@ export default function AdminSiteConfigPage() {
                   </div>
                   <textarea id="home-notice-body" ref={noticeTextareaRef} maxLength={3000} rows={5}
                     value={getValue("home_notice_body")}
-                    placeholder={getValue("site_description") || "输入公告正文"}
+                    placeholder="输入公告正文"
                     onChange={e => setValue("home_notice_body", e.target.value)}
                     className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm" />
                 </div>
@@ -333,8 +313,8 @@ export default function AdminSiteConfigPage() {
                 </div>
                 <div className="overflow-hidden rounded-md border border-border">
                   <HomeAnnouncement
-                    title={configMap.home_notice_title ?? getValue("site_slogan")}
-                    body={configMap.home_notice_body ?? getValue("site_description")}
+                    title={getValue("home_notice_title") || "公告"}
+                    body={getValue("home_notice_body")}
                     font={getValue("home_notice_font")}
                     size={getValue("home_notice_size")}
                     color={getValue("home_notice_color")}

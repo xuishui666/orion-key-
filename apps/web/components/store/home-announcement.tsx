@@ -30,7 +30,7 @@ export function HomeAnnouncement({ title, body, font, size, color, groupUrl, gro
       <div className="mt-3 break-words" style={{ fontFamily: fonts[font ?? ""] ?? fonts.sans, color: textColor }}>
         {title && <h1 className="font-bold leading-tight" style={{ fontSize: bodySize + 10 }}>{title}</h1>}
         {body && (
-          <div className="mt-2 space-y-2 leading-relaxed" style={{ fontSize: bodySize }}>
+          <div className="mt-2 space-y-2 whitespace-pre-line leading-relaxed" style={{ fontSize: bodySize }}>
             <ReactMarkdown
               allowedElements={["p", "strong", "em", "a", "ul", "ol", "li", "br"]}
               unwrapDisallowed

@@ -536,10 +536,6 @@ const zh = {
   "admin.contactTab": "联系方式",
   "admin.maintenanceTab": "维护模式",
   "admin.siteName": "网站名称",
-  "admin.siteSlogan": "网站标语",
-  "admin.siteSloganHint": "显示在首页 Hero 区域的标语文字",
-  "admin.siteDesc": "网站描述",
-  "admin.siteDescHint": "显示在首页标语下方的副标题",
   "admin.logoUrl": "网站 Logo URL",
   "admin.footerText": "页脚文案",
   "admin.githubUrl": "GitHub 地址",
@@ -1164,10 +1160,6 @@ const en: Record<keyof typeof zh, string> = {
   "admin.contactTab": "Contact",
   "admin.maintenanceTab": "Maintenance",
   "admin.siteName": "Site Name",
-  "admin.siteSlogan": "Site Slogan",
-  "admin.siteSloganHint": "Displayed in homepage hero section",
-  "admin.siteDesc": "Site Description",
-  "admin.siteDescHint": "Subtitle displayed below the slogan",
   "admin.logoUrl": "Logo URL",
   "admin.footerText": "Footer Text",
   "admin.githubUrl": "GitHub URL",
@@ -1263,5 +1255,4 @@ export function getDictionary(locale: Locale) {
 }
 
 export type TranslationKey = keyof typeof zh
-
 

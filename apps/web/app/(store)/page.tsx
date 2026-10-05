@@ -7,11 +7,11 @@ export async function generateMetadata(): Promise<Metadata> {
     const config = await getSiteConfig()
     return {
       title: config.site_name || "Orion Key",
-      description: config.site_description || config.site_slogan || "",
+      description: config.home_notice_body?.replace(/\s+/g, " ").trim() || "",
       alternates: { canonical: "/" },
       openGraph: {
         title: config.site_name || "Orion Key",
-        description: config.site_description || config.site_slogan || "",
+        description: config.home_notice_body?.replace(/\s+/g, " ").trim() || "",
         url: "/",
         ...(config.logo_url ? { images: [{ url: config.logo_url }] } : {}),
       },
@@ -32,7 +32,7 @@ export default async function HomePage() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: config?.site_name || "Orion Key",
-    description: config?.site_description || config?.site_slogan || "",
+    description: config?.home_notice_body?.replace(/\s+/g, " ").trim() || "",
   }
 
   return (
@@ -44,8 +44,6 @@ export default async function HomePage() {
       <HomeContent
         products={productsData.list}
         categories={categories}
-        siteSlogan={config?.site_slogan || ""}
-        siteDescription={config?.site_description || ""}
         noticeTitle={config?.home_notice_title}
         noticeBody={config?.home_notice_body}
         noticeFont={config?.home_notice_font}

@@ -460,8 +460,8 @@ export const mockPaymentChannels: PaymentChannelItem[] = [
 
 export const mockSiteConfig: SiteConfig = {
   site_name: "Orion Key",
-  site_slogan: "Unlock Your AI Potential",
-  site_description: "ChatGPT / Claude / Midjourney 等 AI 账号与密钥，自动发货，安全可靠",
+  home_notice_title: "公告",
+  home_notice_body: "自动发货，安全可靠",
   announcement: "新用户注册即送 100 积分！",
   announcement_enabled: false,
   popup_content: "春节特惠活动：全场商品 9 折优惠！",
@@ -478,8 +478,8 @@ export const mockSiteConfig: SiteConfig = {
 
 export const mockSiteConfigKVs: SiteConfigKV[] = [
   { config_key: "site_name", config_value: "Orion Key", config_group: "basic" },
-  { config_key: "site_slogan", config_value: "Unlock Your AI Potential", config_group: "basic" },
-  { config_key: "site_description", config_value: "ChatGPT / Claude / Midjourney 等 AI 账号与密钥，自动发货，安全可靠", config_group: "basic" },
+  { config_key: "home_notice_title", config_value: "公告", config_group: "announcement" },
+  { config_key: "home_notice_body", config_value: "自动发货，安全可靠", config_group: "announcement" },
   { config_key: "announcement_enabled", config_value: "false", config_group: "announcement" },
   { config_key: "announcement", config_value: "新用户注册即送 100 积分！", config_group: "announcement" },
   { config_key: "popup_enabled", config_value: "false", config_group: "popup" },

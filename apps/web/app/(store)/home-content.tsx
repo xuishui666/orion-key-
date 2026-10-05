@@ -17,8 +17,6 @@ import type { ProductCard as ProductCardType, Category } from "@/types"
 interface HomeContentProps {
   products: ProductCardType[]
   categories: Category[]
-  siteSlogan: string
-  siteDescription: string
   noticeTitle?: string
   noticeBody?: string
   noticeFont?: string
@@ -26,7 +24,7 @@ interface HomeContentProps {
   noticeColor?: string
 }
 
-export function HomeContent({ products, categories, siteSlogan, siteDescription,
+export function HomeContent({ products, categories,
   noticeTitle, noticeBody, noticeFont, noticeSize, noticeColor }: HomeContentProps) {
   const { t } = useLocale()
   const { config } = useSiteConfig()
@@ -84,8 +82,8 @@ export function HomeContent({ products, categories, siteSlogan, siteDescription,
   return (
     <div className="mx-auto w-full max-w-7xl 2xl:max-w-[1600px] flex flex-col gap-6">
       <HomeAnnouncement
-        title={noticeTitle ?? siteSlogan}
-        body={noticeBody ?? siteDescription}
+        title={noticeTitle ?? "公告"}
+        body={noticeBody ?? ""}
         font={noticeFont}
         size={noticeSize}
         color={noticeColor}
