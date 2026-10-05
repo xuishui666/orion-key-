@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
-import { ShoppingCart, User, LogIn, Menu, X, Globe, Moon, Sun, Package, Search, Settings, ChevronDown, SlidersHorizontal, LogOut, ClipboardList } from "lucide-react"
+import { ShoppingCart, User, Menu, X, Globe, Moon, Sun, Package, Search, Settings, ChevronDown, SlidersHorizontal, LogOut, ClipboardList } from "lucide-react"
 import { useAuth, useLocale, useTheme, useColorScheme, useSearch, useCart, useSiteConfig, COLOR_SCHEMES, type SortKey } from "@/lib/context"
 import { cn } from "@/lib/utils"
 
@@ -239,9 +239,7 @@ export function StoreHeader({ siteName }: StoreHeaderProps) {
           </Link>
 
           {/* User / Auth — auth 未就绪时显示占位，避免登录按钮闪烁 */}
-          {!authLoaded ? (
-            <div className="h-9 w-9 animate-pulse rounded-md bg-muted" />
-          ) : isLoggedIn ? (
+          {authLoaded && isLoggedIn && user?.role === "ADMIN" && (
             <div className="relative">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -257,14 +255,9 @@ export function StoreHeader({ siteName }: StoreHeaderProps) {
                     <Link href="/profile" onClick={() => setUserMenuOpen(false)} className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-popover-foreground hover:bg-accent">
                       <User className="h-4 w-4" />{t("nav.profile")}
                     </Link>
-                    <Link href="/my/orders" onClick={() => setUserMenuOpen(false)} className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-popover-foreground hover:bg-accent">
-                      <Search className="h-4 w-4" />{t("nav.myOrders")}
+                    <Link href="/admin/dashboard" onClick={() => setUserMenuOpen(false)} className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-popover-foreground hover:bg-accent">
+                      <Settings className="h-4 w-4" />{t("nav.admin")}
                     </Link>
-                    {user?.role === "ADMIN" && (
-                      <Link href="/admin/dashboard" onClick={() => setUserMenuOpen(false)} className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-popover-foreground hover:bg-accent">
-                        <Settings className="h-4 w-4" />{t("nav.admin")}
-                      </Link>
-                    )}
                     <hr className="my-1 border-border" />
                     <button onClick={() => { logout(); setUserMenuOpen(false) }} className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-accent">
                       <LogOut className="h-4 w-4" />{t("nav.logout")}
@@ -273,11 +266,6 @@ export function StoreHeader({ siteName }: StoreHeaderProps) {
                 </>
               )}
             </div>
-          ) : (
-            <Link href="/login" className="inline-flex h-9 items-center rounded-md bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 px-2.5 sm:px-4">
-              <LogIn className="h-4 w-4 sm:hidden" />
-              <span className="hidden sm:inline">{t("nav.login")}</span>
-            </Link>
           )}
 
           {/* Mobile Menu Toggle */}

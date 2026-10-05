@@ -48,6 +48,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     String username = claims.get("username", String.class);
                     String role = claims.get("role", String.class);
 
+                    // Existing customer tokens must behave as guest requests after account login is retired.
+                    if (!"ADMIN".equals(role)) {
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
+
                     // 管理员请求：必须校验数据库中用户状态和角色
                     String path = request.getRequestURI();
                     if ("ADMIN".equals(role) && path.startsWith("/api/admin")) {

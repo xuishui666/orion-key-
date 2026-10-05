@@ -1,6 +1,5 @@
 package com.orionkey.service;
 
-import com.orionkey.common.PageResult;
 import com.orionkey.model.request.ChangePasswordRequest;
 import com.orionkey.model.response.UserProfileResponse;
 
@@ -11,7 +10,5 @@ public interface UserService {
     UserProfileResponse getProfile(UUID userId);
 
     void changePassword(UUID userId, ChangePasswordRequest request);
-
-    PageResult<?> getOrders(UUID userId, String status, int page, int pageSize);
 
 }

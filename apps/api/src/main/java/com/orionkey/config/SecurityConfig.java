@@ -65,7 +65,7 @@ public class SecurityConfig {
                         .requestMatchers("/support/**").permitAll()
                         // Authenticated user endpoints
                         .requestMatchers("/auth/logout").authenticated()
-                        .requestMatchers("/user/**").authenticated()
+                        .requestMatchers("/user/**").hasRole("ADMIN")
                         // Admin endpoints
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/upload/**").hasRole("ADMIN")

@@ -22,7 +22,6 @@ import type {
   CardKeyListItem,
   CardImportBatch,
   OrderCardKey,
-  AdminUserItem,
   AdminOrderItem,
   PaymentChannelItem,
   OperationLog,
@@ -290,10 +289,6 @@ export const userApi = {
     request<UserProfile>("/user/profile"),
   updatePassword: (data: { old_password: string; new_password: string }) =>
     request<null>("/user/password", { method: "PUT", body: JSON.stringify(data) }),
-  getOrders: (params: { page?: number; page_size?: number; status?: string }) => {
-    const qs = buildQuery(params)
-    return request<PaginatedData<OrderBrief>>(`/user/orders?${qs}`)
-  },
 }
 
 // ============================================================
@@ -585,19 +580,6 @@ export const adminSupportApi = {
     if (!res.ok) throw new Error("Image unavailable")
     return res.blob()
   },
-}
-
-// ============================================================
-// Admin User
-// ============================================================
-
-export const adminUserApi = {
-  getList: (params: { page?: number; page_size?: number; keyword?: string }) => {
-    const qs = buildQuery(params)
-    return request<PaginatedData<AdminUserItem>>(`/admin/users?${qs}`)
-  },
-  toggleStatus: (id: string, isDeleted: 0 | 1) =>
-    request<null>(`/admin/users/${id}/toggle`, { method: "POST", body: JSON.stringify({ is_deleted: isDeleted }) }),
 }
 
 // ============================================================

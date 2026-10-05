@@ -210,6 +210,7 @@ const zh = {
 
   // Auth
   "auth.login": "登录",
+  "auth.adminLogin": "管理员登录",
   "auth.register": "注册",
   "auth.username": "用户名",
   "auth.usernameOrEmail": "用户名 / 邮箱",
@@ -299,7 +300,6 @@ const zh = {
   "admin.cardKeys": "卡密管理",
   "admin.orders": "订单管理",
   "admin.support": "客服会话",
-  "admin.users": "用户管理",
   "admin.payment": "支付渠道",
   "admin.siteConfig": "网站设置",
   "admin.logs": "操作日志",
@@ -498,17 +498,6 @@ const zh = {
   "admin.orderItems": "订单商品",
   "admin.cardKeysDetail": "卡密信息",
   "admin.guest": "游客",
-
-  // Admin Users
-  "admin.usersDesc": "管理注册用户",
-  "admin.searchUser": "搜索用户名/邮箱...",
-  "admin.usernameLabel": "用户名",
-  "admin.role": "角色",
-  "admin.registeredAt": "注册时间",
-  "admin.ban": "禁用",
-  "admin.unban": "启用",
-  "admin.noUserData": "暂无用户数据",
-  "admin.totalUsers": "位用户",
 
   // Admin Payment Channels
   "admin.paymentDesc": "配置支付方式",
@@ -824,6 +813,7 @@ const en: Record<keyof typeof zh, string> = {
 
   // Auth
   "auth.login": "Login",
+  "auth.adminLogin": "Admin sign in",
   "auth.register": "Register",
   "auth.username": "Username",
   "auth.usernameOrEmail": "Username / Email",
@@ -913,7 +903,6 @@ const en: Record<keyof typeof zh, string> = {
   "admin.cardKeys": "Card Keys",
   "admin.orders": "Orders",
   "admin.support": "Support",
-  "admin.users": "Users",
   "admin.payment": "Payment",
   "admin.siteConfig": "Site Config",
   "admin.logs": "Operation Logs",
@@ -1112,17 +1101,6 @@ const en: Record<keyof typeof zh, string> = {
   "admin.orderItems": "Order Items",
   "admin.cardKeysDetail": "Card Keys",
   "admin.guest": "Guest",
-
-  // Admin Users
-  "admin.usersDesc": "Manage registered users",
-  "admin.searchUser": "Search username/email...",
-  "admin.usernameLabel": "Username",
-  "admin.role": "Role",
-  "admin.registeredAt": "Registered",
-  "admin.ban": "Disable",
-  "admin.unban": "Enable",
-  "admin.noUserData": "No user data",
-  "admin.totalUsers": "users",
 
   // Admin Payment Channels
   "admin.paymentDesc": "Configure payment methods",

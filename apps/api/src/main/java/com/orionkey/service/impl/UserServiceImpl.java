@@ -1,26 +1,17 @@
 package com.orionkey.service.impl;
 
-import com.orionkey.common.PageResult;
 import com.orionkey.constant.ErrorCode;
-import com.orionkey.constant.OrderStatus;
-import com.orionkey.entity.Order;
 import com.orionkey.entity.User;
 import com.orionkey.exception.BusinessException;
 import com.orionkey.model.request.ChangePasswordRequest;
 import com.orionkey.model.response.UserProfileResponse;
-import com.orionkey.repository.OrderRepository;
 import com.orionkey.repository.UserRepository;
 import com.orionkey.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -28,7 +19,6 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
-    private final OrderRepository orderRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -50,46 +40,4 @@ public class UserServiceImpl implements UserService {
         userRepository.save(user);
     }
 
-    @Override
-    @Transactional
-    public PageResult<?> getOrders(UUID userId, String status, int page, int pageSize) {
-        PageRequest pageable = PageRequest.of(page - 1, pageSize);
-        Page<Order> orderPage;
-        if (status != null) {
-            OrderStatus os;
-            try {
-                os = OrderStatus.valueOf(status);
-            } catch (IllegalArgumentException e) {
-                throw new BusinessException(ErrorCode.BAD_REQUEST, "无效的订单状态: " + status);
-            }
-            orderPage = orderRepository.findByUserIdAndStatusAndIsDeletedOrderByCreatedAtDesc(
-                    userId, os, 0, pageable);
-        } else {
-            orderPage = orderRepository.findByUserIdAndIsDeletedOrderByCreatedAtDesc(userId, 0, pageable);
-        }
-
-        // 主动过期检查：PENDING 且已超时的订单标记为 EXPIRED（与 queryOrders 逻辑一致）
-        LocalDateTime now = LocalDateTime.now();
-        for (Order o : orderPage.getContent()) {
-            if (o.getStatus() == OrderStatus.PENDING && o.getExpiresAt().isBefore(now)) {
-                o.setStatus(OrderStatus.EXPIRED);
-                orderRepository.save(o);
-            }
-        }
-
-        var list = orderPage.getContent().stream().map(this::toOrderBrief).toList();
-        return PageResult.of(orderPage, list);
-    }
-
-    private Map<String, Object> toOrderBrief(Order o) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("id", o.getId());
-        map.put("total_amount", o.getTotalAmount());
-        map.put("actual_amount", o.getActualAmount());
-        map.put("status", o.getStatus().name());
-        map.put("order_type", o.getOrderType().name());
-        map.put("payment_method", o.getPaymentMethod());
-        map.put("created_at", o.getCreatedAt());
-        return map;
-    }
 }

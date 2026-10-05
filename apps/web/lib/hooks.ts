@@ -5,25 +5,6 @@ import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "./context"
 
 /**
- * Redirects to login if user is not authenticated.
- * Passes current path as redirect param so login page can redirect back.
- */
-export function useRequireAuth() {
-  const { user, isLoggedIn, authLoaded } = useAuth()
-  const router = useRouter()
-  const pathname = usePathname()
-
-  useEffect(() => {
-    if (!authLoaded) return
-    if (!isLoggedIn) {
-      router.replace(`/login?redirect=${encodeURIComponent(pathname)}`)
-    }
-  }, [authLoaded, isLoggedIn, router, pathname])
-
-  return authLoaded ? user : null
-}
-
-/**
  * Requires admin role.
  * - Not logged in → redirect to /login?redirect=currentPath
  * - Logged in but not ADMIN → redirect to /

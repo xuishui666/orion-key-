@@ -12,6 +12,10 @@ The application then creates:
 - Password: the value of `ADMIN_BOOTSTRAP_PASSWORD`
 - Role: `ADMIN`
 
+The storefront does not offer customer registration or sign-in. Open `/login`
+directly to sign in as administrator; account details and password changes
+remain available under Profile in the admin sidebar.
+
 Without the password, or with plaintext password storage enabled, a new
 installation fails startup instead of creating an insecure account. The
 repository `docker-compose.yml` passes `.env` to the API container via

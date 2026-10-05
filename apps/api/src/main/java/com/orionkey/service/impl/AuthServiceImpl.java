@@ -1,6 +1,7 @@
 package com.orionkey.service.impl;
 
 import com.orionkey.constant.ErrorCode;
+import com.orionkey.constant.UserRole;
 import com.orionkey.entity.CartItem;
 import com.orionkey.entity.User;
 import com.orionkey.exception.BusinessException;
@@ -78,6 +79,10 @@ public class AuthServiceImpl implements AuthService {
                         "连续登录失败 " + MAX_FAILED_ATTEMPTS + " 次，账号已锁定 " + LOCK_DURATION_MINUTES + " 分钟");
             }
             userRepository.save(user);
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误");
+        }
+
+        if (user.getRole() != UserRole.ADMIN) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误");
         }
 

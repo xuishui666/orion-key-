@@ -67,7 +67,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
           <h1 className="mb-6 text-center text-xl font-bold text-card-foreground">
-            {t("auth.login")}
+            {t("auth.adminLogin")}
           </h1>
 
           <form onSubmit={handleLogin} className="flex flex-col gap-4">

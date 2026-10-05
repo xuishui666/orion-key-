@@ -10,7 +10,7 @@ import {
   KeyRound,
   ShoppingCart,
   MessagesSquare,
-  Users,
+  UserRound,
   CreditCard,
   Settings,
   ScrollText,
@@ -37,7 +37,6 @@ const navItems: { labelKey: TranslationKey; href: string; icon: typeof LayoutDas
   { labelKey: "admin.orders", href: "/admin/orders", icon: ShoppingCart },
   { labelKey: "admin.support", href: "/admin/support", icon: MessagesSquare },
   { labelKey: "admin.revenueStats", href: "/admin/revenue", icon: BarChart3 },
-  { labelKey: "admin.users", href: "/admin/users", icon: Users },
   { labelKey: "admin.payment", href: "/admin/payment-channels", icon: CreditCard },
   { labelKey: "admin.siteConfig", href: "/admin/site-config", icon: Settings },
   { labelKey: "admin.risk", href: "/admin/risk", icon: ShieldAlert },
@@ -212,6 +211,17 @@ export function AdminSidebar() {
             </div>
           )}
 
+          <Link
+            href="/profile"
+            className={cn(
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors",
+              collapsed && "justify-center px-2"
+            )}
+            title={collapsed ? t("nav.profile") : undefined}
+          >
+            <UserRound className="h-4.5 w-4.5 shrink-0" />
+            {!collapsed && <span>{t("nav.profile")}</span>}
+          </Link>
           <button
             type="button"
             onClick={handleLogout}

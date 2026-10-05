@@ -394,15 +394,6 @@ export interface AdminOrderItem extends OrderDetail {
 // Admin Users
 // ============================================================
 
-export interface AdminUserItem {
-  id: string
-  username: string
-  email: string
-  role: string
-  is_deleted: 0 | 1
-  created_at: string
-}
-
 // ============================================================
 // Admin Operation Logs
 // ============================================================

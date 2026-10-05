@@ -309,9 +309,17 @@ export function AppProviders({ children }: { children: ReactNode }) {
     const saved = safeStorageGet("localStorage", "userProfile")
     if (saved) {
       try {
-        setUserState(JSON.parse(saved))
+        const profile = JSON.parse(saved) as UserProfile
+        if (profile?.role === "ADMIN") {
+          setUserState(profile)
+        } else {
+          clearToken()
+          safeStorageRemove("localStorage", "userProfile")
+        }
       } catch (e) {
         console.error("Failed to parse saved user profile:", e)
+        clearToken()
+        safeStorageRemove("localStorage", "userProfile")
       }
     }
     setAuthLoaded(true)

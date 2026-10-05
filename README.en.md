@@ -52,7 +52,7 @@
 | 🛒 **Auto Delivery** — Automatic key distribution after payment | 🎨 **Theming** — Light/dark mode with multiple accent colors |
 | 📦 **Product Management** — Categories, stock control, bulk key import | 🔒 **Security** — Stateless JWT auth + BCrypt encryption |
 | 💳 **Multi-Payment** — Extensible payment architecture (WeChat/Alipay) | 🛡️ **Risk Control** — IP rate limiting, brute-force protection, order anti-fraud |
-| 📊 **Admin Dashboard** — Sales overview, order/user/site management | 🔍 **Order Tracking** — Query keys by order number (guest & member) |
+| 📊 **Admin Dashboard** — Sales overview, order and site management | 🔍 **Order Tracking** — Guest order lookup by order number |
 | 🛍️ **Shopping Cart** — Multi-item checkout in one order | ⚙️ **Site Config** — Announcements, popups, maintenance mode via admin panel |
 
 ---

@@ -6,7 +6,7 @@ import { User, Lock, Eye, EyeOff, Save } from "lucide-react"
 import { toast } from "sonner"
 import { useLocale } from "@/lib/context"
 import { useAuth } from "@/lib/context"
-import { useRequireAuth } from "@/lib/hooks"
+import { useRequireAdmin } from "@/lib/hooks"
 import { userApi, withMockFallback, getApiErrorMessage } from "@/services/api"
 import { cn } from "@/lib/utils"
 
@@ -14,7 +14,7 @@ type Tab = "info" | "password"
 
 export default function ProfilePage() {
   const { t } = useLocale()
-  const currentUser = useRequireAuth()
+  const currentUser = useRequireAdmin()
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>("info")
 

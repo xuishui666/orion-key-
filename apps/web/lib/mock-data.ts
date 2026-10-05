@@ -11,7 +11,6 @@ import type {
   SalesTrend,
   CardKeyStockSummary,
   CardImportBatch,
-  AdminUserItem,
   OperationLog,
   PaymentChannelItem,
   SiteConfig,
@@ -419,12 +418,6 @@ export const mockOrderCardKeys: OrderCardKey[] = [
 // Admin Users
 // ============================================================
 
-export const mockAdminUsers: AdminUserItem[] = [
-  { id: uuid(701), username: "john_doe", email: "john@example.com", role: "USER", is_deleted: 0, created_at: "2025-01-10T08:00:00Z" },
-  { id: uuid(702), username: "alice_w", email: "alice@example.com", role: "USER", is_deleted: 0, created_at: "2025-01-12T08:00:00Z" },
-  { id: uuid(703), username: "bob_test", email: "bob@test.com", role: "USER", is_deleted: 1, created_at: "2025-01-15T08:00:00Z" },
-]
-
 // ============================================================
 // Operation Logs
 // ============================================================
@@ -517,14 +510,6 @@ export const mockAdminOrders: AdminOrderItem[] = mockOrderDetails.map((o, i) => 
 // Mock User
 // ============================================================
 
-export const mockUser: UserProfile = {
-  id: uuid(701),
-  username: "john_doe",
-  email: "john@example.com",
-  role: "USER",
-  created_at: "2025-01-10T08:00:00Z",
-}
-
 export const mockAdminUser: UserProfile = {
   id: uuid(901),
   username: "admin",
@@ -542,7 +527,7 @@ export function mockCaptcha(): CaptchaResult {
 }
 
 export function mockLogin(): AuthResult {
-  return { token: "mock-jwt-token-" + Date.now(), user: mockUser }
+  return { token: "mock-jwt-token-" + Date.now(), user: mockAdminUser }
 }
 
 export function mockProductList(params?: { category_id?: string; keyword?: string; page?: number; page_size?: number }): PaginatedData<ProductCard> {
@@ -646,20 +631,6 @@ export function mockAdminOrderList(params?: { status?: string; page?: number; pa
   let filtered = [...mockAdminOrders]
   if (params?.status) {
     filtered = filtered.filter(o => o.status === params.status)
-  }
-  const page = params?.page ?? 1
-  const pageSize = params?.page_size ?? 20
-  return {
-    list: filtered.slice((page - 1) * pageSize, page * pageSize),
-    pagination: { page, page_size: pageSize, total: filtered.length },
-  }
-}
-
-export function mockAdminUserList(params?: { keyword?: string; page?: number; page_size?: number }): PaginatedData<AdminUserItem> {
-  let filtered = [...mockAdminUsers]
-  if (params?.keyword) {
-    const kw = params.keyword.toLowerCase()
-    filtered = filtered.filter(u => u.username.toLowerCase().includes(kw) || u.email.toLowerCase().includes(kw))
   }
   const page = params?.page ?? 1
   const pageSize = params?.page_size ?? 20
