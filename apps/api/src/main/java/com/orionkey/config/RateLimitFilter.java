@@ -48,7 +48,7 @@ public class RateLimitFilter implements Filter {
 
     /** 敏感端点路径 */
     private static final Set<String> LOGIN_PATHS = Set.of(
-            "/api/auth/login", "/api/auth/register"
+            "/api/auth/login"
     );
 
     private Set<String> getTrustedProxies() {

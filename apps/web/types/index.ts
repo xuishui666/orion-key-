@@ -29,14 +29,6 @@ export interface LoginRequest {
   password: string
 }
 
-export interface RegisterRequest {
-  username: string
-  password: string
-  email: string
-  captcha_id: string
-  captcha: string
-}
-
 export interface CaptchaResult {
   captcha_id: string
   captcha_image: string
@@ -52,7 +44,6 @@ export interface UserProfile {
   username: string
   email: string
   role: 'USER' | 'ADMIN'
-  points: number
   created_at: string
 }
 
@@ -170,8 +161,6 @@ export interface OrderItemDetail {
 
 export interface OrderDetail extends OrderBrief {
   email: string
-  points_deducted: number
-  points_discount: number
   expires_at: string
   paid_at: string | null
   delivered_at: string | null
@@ -283,8 +272,6 @@ export interface SiteConfig {
   contact_telegram?: string
   contact_telegram_group?: string
   support_welcome_message?: string
-  points_enabled: boolean
-  points_rate: number
   maintenance_enabled: boolean
   maintenance_message?: string
   footer_text?: string
@@ -308,7 +295,6 @@ export interface CreateOrderRequest {
   quantity: number
   email: string
   payment_method: string
-  use_points?: boolean
   idempotency_key: string
   device?: string
 }
@@ -316,27 +302,8 @@ export interface CreateOrderRequest {
 export interface CreateCartOrderRequest {
   email: string
   payment_method: string
-  use_points?: boolean
   idempotency_key: string
   device?: string
-}
-
-// ============================================================
-// Points
-// ============================================================
-
-export interface PointRecord {
-  change_amount: number
-  balance_after: number
-  reason: string
-  order_id: string | null
-  created_at: string
-}
-
-export interface PointsData {
-  total_points: number
-  list: PointRecord[]
-  pagination: Pagination
 }
 
 // ============================================================
@@ -432,7 +399,6 @@ export interface AdminUserItem {
   username: string
   email: string
   role: string
-  points: number
   is_deleted: 0 | 1
   created_at: string
 }
@@ -467,7 +433,6 @@ export interface RiskConfig {
   txid_submit_limit_per_order: number
   device_query_limit_per_hour: number
   device_login_limit_per_hour: number
-  device_register_limit_per_hour: number
   // 已有配置
   rate_limit_per_second: number
   login_attempt_limit: number

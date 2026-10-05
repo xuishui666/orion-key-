@@ -43,6 +43,10 @@ public interface CardKeyRepository extends JpaRepository<CardKey, UUID> {
 
     List<CardKey> findByOrderIdAndIsDeleted(UUID orderId, int isDeleted);
 
+    @Modifying
+    @Query("UPDATE CardKey ck SET ck.orderId = null, ck.orderItemId = null WHERE ck.orderId IN :orderIds")
+    int detachOrders(@Param("orderIds") List<UUID> orderIds);
+
     default List<CardKey> findByOrderId(UUID orderId) {
         return findByOrderIdAndIsDeleted(orderId, 0);
     }

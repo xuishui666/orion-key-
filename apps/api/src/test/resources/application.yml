@@ -28,6 +28,10 @@ jwt:
   secret: test-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm
   expiration: 86400000
 
+ADMIN_BOOTSTRAP_PASSWORD: ${random.uuid}
+security:
+  password-plain: false
+
 upload:
   path: ./test-uploads
   url-prefix: /uploads

@@ -5,8 +5,6 @@ import type {
   OrderBrief,
   OrderDetail,
   OrderStatus,
-  PointRecord,
-  PointsData,
   ProductCard,
   ProductDetail,
   ProductSpec,
@@ -277,8 +275,6 @@ export async function withMockFallback<T>(
 export const authApi = {
   getCaptcha: () =>
     request<CaptchaResult>("/auth/captcha"),
-  register: (data: { username: string; password: string; email: string; captcha_id: string; captcha: string }, turnstileToken?: string) =>
-    request<AuthResult>("/auth/register", { method: "POST", body: JSON.stringify(data), turnstileToken }),
   login: (data: { account: string; password: string }, turnstileToken?: string) =>
     request<AuthResult>("/auth/login", { method: "POST", body: JSON.stringify(data), turnstileToken }),
   logout: () =>
@@ -297,10 +293,6 @@ export const userApi = {
   getOrders: (params: { page?: number; page_size?: number; status?: string }) => {
     const qs = buildQuery(params)
     return request<PaginatedData<OrderBrief>>(`/user/orders?${qs}`)
-  },
-  getPoints: (params: { page?: number; page_size?: number }) => {
-    const qs = buildQuery(params)
-    return request<PointsData>(`/user/points?${qs}`)
   },
 }
 

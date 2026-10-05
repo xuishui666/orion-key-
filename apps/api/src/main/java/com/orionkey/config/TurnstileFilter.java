@@ -55,8 +55,7 @@ public class TurnstileFilter implements Filter {
     private static final Set<String> EXACT_PATHS = Set.of(
             "/api/orders",
             "/api/orders/from-cart",
-            "/api/auth/login",
-            "/api/auth/register"
+            "/api/auth/login"
     );
 
     /** 开关配置缓存（60 秒刷新） */

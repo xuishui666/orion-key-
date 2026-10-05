@@ -106,7 +106,6 @@ export default function AdminUsersPage() {
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t("admin.usernameLabel")}</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t("admin.emailLabel")}</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t("admin.role")}</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t("admin.pointsLabel")}</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t("admin.statusLabel")}</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t("admin.registeredAt")}</th>
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">{t("admin.actions")}</th>
@@ -115,7 +114,7 @@ export default function AdminUsersPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-12">
+                  <td colSpan={6} className="py-12">
                     <div className="flex items-center justify-center">
                       <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                     </div>
@@ -123,7 +122,7 @@ export default function AdminUsersPage() {
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-sm text-muted-foreground">{t("admin.noUserData")}</td>
+                  <td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">{t("admin.noUserData")}</td>
                 </tr>
               ) : (
                 users.map((user) => (
@@ -131,7 +130,6 @@ export default function AdminUsersPage() {
                     <td className="px-4 py-3 font-medium text-foreground">{user.username}</td>
                     <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
                     <td className="px-4 py-3 text-foreground">{user.role}</td>
-                    <td className="px-4 py-3 text-foreground">{user.points}</td>
                     <td className="px-4 py-3">
                       <span
                         className={cn(

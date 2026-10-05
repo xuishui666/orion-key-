@@ -92,4 +92,3 @@ support:
     chat-id: ${SUPPORT_TELEGRAM_CHAT_ID:}
     webhook-secret: ${SUPPORT_TELEGRAM_WEBHOOK_SECRET:}
     webhook-url: ${SUPPORT_TELEGRAM_WEBHOOK_URL:}
-

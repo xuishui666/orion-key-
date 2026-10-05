@@ -5,18 +5,7 @@
 -- ============================================================
 
 -- ────────────────────────────────────────
--- 1. 管理员账户 (密码: admin123，请首次登录后立即修改)
---    默认使用 BCrypt 哈希。若 application.yml 设置了 security.password-plain: true，
---    则需将下方 password_hash 改为明文 'admin123'
--- ────────────────────────────────────────
-INSERT INTO users (id, username, email, password_hash, role, points, is_deleted, failed_login_attempts, lock_until, created_at, updated_at)
-SELECT gen_random_uuid(), 'admin', 'admin@orionkey.com',
-       '123456#',
-       'ADMIN', 0, 0, 0, NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin');
-
--- ────────────────────────────────────────
--- 2. 站点配置 (config_group = 'site')
+-- 站点配置 (config_group = 'site')
 -- ────────────────────────────────────────
 
 -- 站点名称，显示在页面标题和 Header
@@ -42,16 +31,6 @@ SELECT gen_random_uuid(), 'footer_text', '由开源 Orion Key 提供服务', 'si
 INSERT INTO site_configs (id, config_key, config_value, config_group, created_at, updated_at)
 SELECT gen_random_uuid(), 'github_url', 'https://github.com/RivenLau/orion-key', 'site', NOW(), NOW()
     WHERE NOT EXISTS (SELECT 1 FROM site_configs WHERE config_key = 'github_url');
-
--- 积分功能总开关 (true/false)
-INSERT INTO site_configs (id, config_key, config_value, config_group, created_at, updated_at)
-SELECT gen_random_uuid(), 'points_enabled', 'false', 'site', NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM site_configs WHERE config_key = 'points_enabled');
-
--- 积分倍率：每消费 1 元获得的积分数
-INSERT INTO site_configs (id, config_key, config_value, config_group, created_at, updated_at)
-SELECT gen_random_uuid(), 'points_rate', '1', 'site', NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM site_configs WHERE config_key = 'points_rate');
 
 -- 维护模式开关，开启后非管理员请求返回 503 (true/false)
 INSERT INTO site_configs (id, config_key, config_value, config_group, created_at, updated_at)
@@ -136,11 +115,6 @@ WHERE NOT EXISTS (SELECT 1 FROM site_configs WHERE config_key = 'device_query_li
 INSERT INTO site_configs (id, config_key, config_value, config_group, created_at, updated_at)
 SELECT gen_random_uuid(), 'device_login_limit_per_hour', '10', 'risk', NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM site_configs WHERE config_key = 'device_login_limit_per_hour');
-
--- 设备指纹限流：注册频率上限（次/小时/设备）
-INSERT INTO site_configs (id, config_key, config_value, config_group, created_at, updated_at)
-SELECT gen_random_uuid(), 'device_register_limit_per_hour', '10', 'risk', NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM site_configs WHERE config_key = 'device_register_limit_per_hour');
 
 
 -- ────────────────────────────────────────

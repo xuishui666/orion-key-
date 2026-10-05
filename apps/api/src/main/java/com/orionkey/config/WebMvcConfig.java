@@ -69,4 +69,3 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addResourceLocations(location);
     }
 }
-

@@ -3,6 +3,7 @@ package com.orionkey.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.orionkey.entity.Order;
 import com.orionkey.entity.PaymentChannel;
+import com.orionkey.entity.UnmatchedTransaction;
 import com.orionkey.repository.*;
 import com.orionkey.service.*;
 import org.junit.jupiter.api.Test;
@@ -14,13 +15,48 @@ import static org.mockito.Mockito.*;
 
 class BepusdtCallbackRetryTest {
     @Test
+    void purgedOrderTxidCannotPayAnotherOrder() {
+        var events = mock(WebhookEventRepository.class);
+        var orders = mock(OrderRepository.class);
+        var channels = mock(PaymentChannelRepository.class);
+        var reviews = mock(UnmatchedTransactionRepository.class);
+        var gateway = mock(BepusdtService.class);
+        var chain = mock(TxidVerifyService.class);
+        var service = new WebhookServiceImpl(events, orders, channels, reviews, mock(EpayService.class),
+                gateway, new ObjectMapper(), mock(PaymentServiceImpl.class), chain);
+        var order = new Order();
+        order.setId(UUID.randomUUID());
+        order.setCreatedAt(java.time.LocalDateTime.now());
+        order.setPaymentMethod("usdt_bep20");
+        order.setUsdtCryptoAmount("1.00");
+        order.setUsdtWalletAddress("test-wallet");
+        var channel = new PaymentChannel();
+        channel.setConfigData("{\"api_token\":\"test-only\"}");
+        var marker = new UnmatchedTransaction();
+        marker.setTxid("old-txid");
+        marker.setSource("PURGED_ORDER");
+        when(orders.findById(order.getId())).thenReturn(Optional.of(order));
+        when(channels.findByChannelCodeAndIsDeleted("usdt_bep20", 0)).thenReturn(Optional.of(channel));
+        when(gateway.verifySign(anyString(), anyMap(), anyString())).thenReturn(true);
+        when(chain.verifyForWebhook(any(), any(), any(), any(), any()))
+                .thenReturn(new TxidVerifyService.ChainVerifyResult(true, "OK"));
+        when(reviews.findByTxid("old-txid")).thenReturn(Optional.of(marker));
+
+        Map<String, Object> params = Map.of("order_id", order.getId().toString(), "trade_id", "new-trade",
+                "status", 2, "actual_amount", "1.00", "signature", "test-signature",
+                "block_transaction_id", "old-txid");
+        assertEquals("ok", service.processBepusdtCallback(params));
+        verify(orders, never()).save(any());
+    }
+
+    @Test
     void incompletePaymentContextAndPendingChainVerificationRemainRetryable() {
         var events = mock(WebhookEventRepository.class);
         var orders = mock(OrderRepository.class);
         var channels = mock(PaymentChannelRepository.class);
         var gateway = mock(BepusdtService.class);
         var chain = mock(TxidVerifyService.class);
-        var service = new WebhookServiceImpl(events, orders, channels, mock(EpayService.class),
+        var service = new WebhookServiceImpl(events, orders, channels, mock(UnmatchedTransactionRepository.class), mock(EpayService.class),
                 gateway, new ObjectMapper(), mock(PaymentServiceImpl.class), chain);
         var order = new Order();
         order.setId(UUID.randomUUID());

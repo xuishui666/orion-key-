@@ -27,9 +27,6 @@ public class DeliverServiceImpl implements DeliverService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CardKeyRepository cardKeyRepository;
-    private final UserRepository userRepository;
-    private final PointsLogRepository pointsLogRepository;
-    private final SiteConfigRepository siteConfigRepository;
     private final UnmatchedTransactionRepository unmatchedTransactionRepository;
     private final EmailService emailService;
 
@@ -160,9 +157,6 @@ public class DeliverServiceImpl implements DeliverService {
                     order.setDeliveredAt(LocalDateTime.now());
                     orderRepository.save(order);
 
-                    // Award points
-                    awardPoints(order);
-
                     // Send delivery email after transaction commits (async, non-blocking)
                     TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                         @Override
@@ -249,34 +243,4 @@ public class DeliverServiceImpl implements DeliverService {
         return groups;
     }
 
-    private void awardPoints(Order order) {
-        if (order.getUserId() == null) return;
-        boolean pointsEnabled = siteConfigRepository.findByConfigKey("points_enabled")
-                .map(c -> "true".equalsIgnoreCase(c.getConfigValue()))
-                .orElse(false);
-        if (!pointsEnabled) return;
-
-        int pointsRate = siteConfigRepository.findByConfigKey("points_rate")
-                .map(c -> { try { return Integer.parseInt(c.getConfigValue()); } catch (Exception e) { return 0; } })
-                .orElse(0);
-        if (pointsRate <= 0) return;
-
-        int pointsEarned = order.getActualAmount().multiply(java.math.BigDecimal.valueOf(pointsRate))
-                .setScale(0, java.math.RoundingMode.FLOOR).intValue();
-        if (pointsEarned <= 0) return;
-
-        User user = userRepository.findById(order.getUserId()).orElse(null);
-        if (user == null) return;
-
-        user.setPoints(user.getPoints() + pointsEarned);
-        userRepository.save(user);
-
-        PointsLog log = new PointsLog();
-        log.setUserId(user.getId());
-        log.setChangeAmount(pointsEarned);
-        log.setBalanceAfter(user.getPoints());
-        log.setReason("购物奖励积分");
-        log.setOrderId(order.getId());
-        pointsLogRepository.save(log);
-    }
 }

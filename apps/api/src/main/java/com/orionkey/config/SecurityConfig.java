@@ -49,7 +49,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints
-                        .requestMatchers("/auth/captcha", "/auth/register", "/auth/login").permitAll()
+                        .requestMatchers("/auth/captcha", "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/products/**", "/categories", "/site/config", "/payment-channels", "/currencies").permitAll()
                         .requestMatchers("/orders/query", "/orders/deliver").permitAll()
                         .requestMatchers(HttpMethod.GET, "/orders/*/status", "/orders/*/export").permitAll()
@@ -76,4 +76,3 @@ public class SecurityConfig {
         return http.build();
     }
 }
-

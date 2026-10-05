@@ -27,4 +27,3 @@ public class SupportConversation extends BaseEntity {
     @Column(nullable = false)
     private LocalDateTime lastActivityAt;
 }
-

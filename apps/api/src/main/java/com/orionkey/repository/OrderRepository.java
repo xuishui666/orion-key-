@@ -44,6 +44,20 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT o FROM Order o WHERE o.isDeleted = 0 AND o.status = com.orionkey.constant.OrderStatus.PENDING AND o.expiresAt < :now")
     List<Order> findExpiredOrders(@Param("now") LocalDateTime now);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Order o WHERE " +
+            "(o.status = com.orionkey.constant.OrderStatus.DELIVERED AND o.paidAt < :paidCutoff " +
+            "AND (o.usdtTxId IS NULL OR NOT EXISTS (SELECT ut.id FROM UnmatchedTransaction ut " +
+            "WHERE ut.txid = o.usdtTxId AND ut.status = 'PENDING_REVIEW' " +
+            "AND (ut.orderId IS NULL OR ut.orderId <> o.id)))) OR " +
+            "(o.status IN (com.orionkey.constant.OrderStatus.PENDING, com.orionkey.constant.OrderStatus.EXPIRED) " +
+            "AND o.createdAt < :unpaidCutoff AND o.expiresAt < :now AND NOT EXISTS " +
+            "(SELECT ut.id FROM UnmatchedTransaction ut WHERE ut.orderId = o.id AND ut.status = 'PENDING_REVIEW')) " +
+            "ORDER BY o.createdAt ASC")
+    List<Order> findPurgeCandidates(@Param("paidCutoff") LocalDateTime paidCutoff,
+                                    @Param("unpaidCutoff") LocalDateTime unpaidCutoff,
+                                    @Param("now") LocalDateTime now, Pageable pageable);
+
     long countByUserIdAndStatusAndIsDeleted(UUID userId, OrderStatus status, int isDeleted);
 
     default long countByUserIdAndStatus(UUID userId, OrderStatus status) {

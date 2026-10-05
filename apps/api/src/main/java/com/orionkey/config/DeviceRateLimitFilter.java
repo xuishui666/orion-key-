@@ -64,12 +64,11 @@ public class DeviceRateLimitFilter implements Filter {
     private volatile int txidOrderLimit = 3;
     private volatile int queryLimit = 20;
     private volatile int loginLimit = 10;
-    private volatile int registerLimit = 5;
     private volatile long configCacheExpiry = 0;
 
     /** 限流类别 */
     private enum Category {
-        ORDER, TXID, QUERY, LOGIN, REGISTER, NONE
+        ORDER, TXID, QUERY, LOGIN, NONE
     }
 
     @Override
@@ -117,7 +116,6 @@ public class DeviceRateLimitFilter implements Filter {
             case TXID -> txidDeviceLimit;
             case QUERY -> queryLimit;
             case LOGIN -> loginLimit;
-            case REGISTER -> registerLimit;
             default -> 20;
         };
 
@@ -168,9 +166,6 @@ public class DeviceRateLimitFilter implements Filter {
             }
             if ("/api/auth/login".equals(path)) {
                 return Category.LOGIN;
-            }
-            if ("/api/auth/register".equals(path)) {
-                return Category.REGISTER;
             }
             // POST 动态路径
             if (TXID_PATH_PATTERN.matcher(path).matches()) {
@@ -230,7 +225,6 @@ public class DeviceRateLimitFilter implements Filter {
                 txidOrderLimit = getConfigInt("txid_submit_limit_per_order", 3);
                 queryLimit = getConfigInt("device_query_limit_per_hour", 20);
                 loginLimit = getConfigInt("device_login_limit_per_hour", 10);
-                registerLimit = getConfigInt("device_register_limit_per_hour", 5);
             } catch (Exception e) {
                 // DB 不可用时使用缓存值
             }

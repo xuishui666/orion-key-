@@ -4,13 +4,11 @@ import com.orionkey.common.PageResult;
 import com.orionkey.constant.ErrorCode;
 import com.orionkey.constant.OrderStatus;
 import com.orionkey.entity.Order;
-import com.orionkey.entity.PointsLog;
 import com.orionkey.entity.User;
 import com.orionkey.exception.BusinessException;
 import com.orionkey.model.request.ChangePasswordRequest;
 import com.orionkey.model.response.UserProfileResponse;
 import com.orionkey.repository.OrderRepository;
-import com.orionkey.repository.PointsLogRepository;
 import com.orionkey.repository.UserRepository;
 import com.orionkey.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +29,6 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
-    private final PointsLogRepository pointsLogRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -82,20 +79,6 @@ public class UserServiceImpl implements UserService {
 
         var list = orderPage.getContent().stream().map(this::toOrderBrief).toList();
         return PageResult.of(orderPage, list);
-    }
-
-    @Override
-    public Map<String, Object> getPoints(UUID userId, int page, int pageSize) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
-        PageRequest pageable = PageRequest.of(page - 1, pageSize);
-        Page<PointsLog> logPage = pointsLogRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("total_points", user.getPoints());
-        result.put("list", logPage.getContent());
-        result.put("pagination", new PageResult.Pagination(page, pageSize, logPage.getTotalElements()));
-        return result;
     }
 
     private Map<String, Object> toOrderBrief(Order o) {

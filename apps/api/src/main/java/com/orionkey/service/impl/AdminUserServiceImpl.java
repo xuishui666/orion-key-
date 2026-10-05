@@ -35,7 +35,6 @@ public class AdminUserServiceImpl implements AdminUserService {
             map.put("username", u.getUsername());
             map.put("email", u.getEmail());
             map.put("role", u.getRole().name());
-            map.put("points", u.getPoints());
             map.put("is_deleted", u.getIsDeleted());
             map.put("created_at", u.getCreatedAt());
             return map;

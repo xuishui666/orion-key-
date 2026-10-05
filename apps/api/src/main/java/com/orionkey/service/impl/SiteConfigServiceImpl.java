@@ -23,13 +23,11 @@ public class SiteConfigServiceImpl implements SiteConfigService {
     @org.springframework.beans.factory.annotation.Value("${turnstile.site-key:}")
     private String turnstileSiteKey;
 
-    private static final Set<String> NUMERIC_KEYS = Set.of("points_rate");
-
     private static final List<String> PUBLIC_KEYS = List.of(
             "site_name", "site_slogan", "site_description", "logo_url", "favicon_url",
             "announcement_enabled", "announcement", "popup_enabled", "popup_content",
             "home_notice_title", "home_notice_body", "home_notice_font", "home_notice_size", "home_notice_color",
-            "contact_email", "contact_telegram", "contact_telegram_group", "support_welcome_message", "points_enabled", "points_rate",
+            "contact_email", "contact_telegram", "contact_telegram_group", "support_welcome_message",
             "maintenance_enabled", "maintenance_message", "footer_text", "github_url", "custom_css"
     );
 
@@ -42,8 +40,6 @@ public class SiteConfigServiceImpl implements SiteConfigService {
             "home_notice_title", "home_notice_body", "home_notice_font", "home_notice_size", "home_notice_color",
             // 联系方式
             "contact_email", "contact_telegram", "contact_telegram_group", "support_welcome_message",
-            // 积分
-            "points_enabled", "points_rate",
             // 维护模式
             "maintenance_enabled", "maintenance_message",
             // 页脚 / 外链
@@ -70,12 +66,6 @@ public class SiteConfigServiceImpl implements SiteConfigService {
                 String val = c.getConfigValue();
                 if ("true".equalsIgnoreCase(val) || "false".equalsIgnoreCase(val)) {
                     result.put(key, Boolean.parseBoolean(val));
-                } else if (NUMERIC_KEYS.contains(key)) {
-                    try {
-                        result.put(key, Integer.parseInt(val));
-                    } catch (NumberFormatException e) {
-                        result.put(key, val);
-                    }
                 } else {
                     result.put(key, val);
                 }

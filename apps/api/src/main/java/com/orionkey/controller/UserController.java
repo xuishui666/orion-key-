@@ -10,7 +10,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 
 @RestController
 @RequestMapping("/user")
@@ -38,10 +37,4 @@ public class UserController {
         return ApiResponse.success(userService.getOrders(RequestContext.getUserId(), status, page, pageSize));
     }
 
-    @GetMapping("/points")
-    public ApiResponse<Map<String, Object>> getPoints(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(value = "page_size", defaultValue = "20") int pageSize) {
-        return ApiResponse.success(userService.getPoints(RequestContext.getUserId(), page, pageSize));
-    }
 }

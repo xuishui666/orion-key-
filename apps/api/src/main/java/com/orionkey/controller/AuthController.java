@@ -2,7 +2,6 @@ package com.orionkey.controller;
 
 import com.orionkey.common.ApiResponse;
 import com.orionkey.model.request.LoginRequest;
-import com.orionkey.model.request.RegisterRequest;
 import com.orionkey.model.response.AuthResponse;
 import com.orionkey.model.response.CaptchaResponse;
 import com.orionkey.service.AuthService;
@@ -20,11 +19,6 @@ public class AuthController {
     @GetMapping("/captcha")
     public ApiResponse<CaptchaResponse> getCaptcha() {
         return ApiResponse.success(authService.generateCaptcha());
-    }
-
-    @PostMapping("/register")
-    public ApiResponse<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return ApiResponse.success(authService.register(request));
     }
 
     @PostMapping("/login")

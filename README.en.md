@@ -36,13 +36,12 @@
 
 ## Online Demo
 
-> Live demo environment is open — log in to the admin panel to explore the full feature set.
+> The storefront demo is open; no public administrator credentials are provided.
 
 | | URL |
 |---|---|
 | 🛒 **Storefront** | <a href="https://www.orionkey-demo.com/" target="_blank" rel="noopener noreferrer">https://www.orionkey-demo.com/</a> |
 | 🛠️ **Admin Panel** | <a href="https://www.orionkey-demo.com/admin" target="_blank" rel="noopener noreferrer">https://www.orionkey-demo.com/admin</a> |
-| 🔑 **Admin Credentials** | `admin` / `123456` |
 
 ---
 
@@ -70,9 +69,6 @@
 | USDT (BEP-20) | BEpusdt Self-hosted | On-chain auto-confirmation, no third-party custody |
 
 > Extensible payment architecture — configure and switch channels freely via admin panel.
-
-💡 **Epay Onboarding Referral** (CN mainland users): <a href="https://api.niman.cn/user/?invite=X1NUVw" target="_blank" rel="noopener noreferrer">https://api.niman.cn/user/?invite=X1NUVw</a>
-> After signing up via this link, contact Epay support on QQ **440933** (with note **1203**) to enjoy a permanent ultra-low **3%** withdrawal fee.
 
 ---
 
@@ -115,7 +111,7 @@ orion-key/
 │           │   └── model/            # DTOs / VOs
 │           └── resources/
 │               ├── application.yml   # App config (DB, JWT, mail, uploads, etc.)
-│               └── data.sql          # Seed data (admin account, site config, payment channels)
+│               └── data.sql          # Seed data (site config, payment channels)
 │
 ├── docker-compose.yml                # Docker Compose orchestration (production / local)
 ├── .env.example                      # Environment variable template
@@ -154,7 +150,7 @@ spring:
     password: ${DB_PASSWORD:your_password}
 ```
 
-Tables are auto-created on first startup (`ddl-auto: update`). After startup, run the seed SQL once to insert admin account, site config, and payment channels:
+Tables are auto-created on first startup (`ddl-auto: update`). Before starting an empty installation, set a private `ADMIN_BOOTSTRAP_PASSWORD` and `PASSWORD_PLAIN=false` in the API environment (see [Initial Administrator](ADMIN-BOOTSTRAP.md)). After startup, the optional seed SQL adds site config and payment channels, but no administrator:
 
 ```bash
 psql -U orionkey -d orion_key -f apps/api/src/main/resources/data.sql
@@ -283,22 +279,6 @@ pnpm dev:web
 ## AI Store (Not a Demo)
 
 [![Orion Key Shop](https://img.shields.io/badge/Orion%20Key%20Shop-Visit%20Store-FF6B00?style=for-the-badge)](https://www.orionkey.shop/)
-
----
-
-## Telegram Group
-
-[![Telegram](https://img.shields.io/badge/Telegram-Group-26A5E4?logo=telegram&logoColor=white)](https://t.me/+7Gx0vtwWixI3ODZh)
-
----
-
-## Business Inquiries
-
-**Custom card-key platform development & business inquiries · WeChat: Aarion666**
-
-<p align="center">
-  <img src=".github/assets/contact.jpg" alt="Business contact QR code" width="240" />
-</p>
 
 ---
 

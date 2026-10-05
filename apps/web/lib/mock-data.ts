@@ -17,8 +17,6 @@ import type {
   SiteConfig,
   RiskConfig,
   AdminOrderItem,
-  PointRecord,
-  PointsData,
   PaginatedData,
   UserProfile,
   CaptchaResult,
@@ -317,8 +315,6 @@ export const mockOrderDetails: OrderDetail[] = [
   {
     ...mockOrderBriefs[0],
     email: "user@example.com",
-    points_deducted: 0,
-    points_discount: 0,
     expires_at: "2025-02-01T10:15:00Z",
     paid_at: "2025-02-01T10:05:00Z",
     delivered_at: "2025-02-01T10:05:01Z",
@@ -329,8 +325,6 @@ export const mockOrderDetails: OrderDetail[] = [
   {
     ...mockOrderBriefs[1],
     email: "user@example.com",
-    points_deducted: 500,
-    points_discount: 5.0,
     expires_at: "2025-02-01T14:15:00Z",
     paid_at: null,
     delivered_at: null,
@@ -341,8 +335,6 @@ export const mockOrderDetails: OrderDetail[] = [
   {
     ...mockOrderBriefs[2],
     email: "buyer@test.com",
-    points_deducted: 0,
-    points_discount: 0,
     expires_at: "2025-01-31T10:15:00Z",
     paid_at: null,
     delivered_at: null,
@@ -428,9 +420,9 @@ export const mockOrderCardKeys: OrderCardKey[] = [
 // ============================================================
 
 export const mockAdminUsers: AdminUserItem[] = [
-  { id: uuid(701), username: "john_doe", email: "john@example.com", role: "USER", points: 3200, is_deleted: 0, created_at: "2025-01-10T08:00:00Z" },
-  { id: uuid(702), username: "alice_w", email: "alice@example.com", role: "USER", points: 1500, is_deleted: 0, created_at: "2025-01-12T08:00:00Z" },
-  { id: uuid(703), username: "bob_test", email: "bob@test.com", role: "USER", points: 200, is_deleted: 1, created_at: "2025-01-15T08:00:00Z" },
+  { id: uuid(701), username: "john_doe", email: "john@example.com", role: "USER", is_deleted: 0, created_at: "2025-01-10T08:00:00Z" },
+  { id: uuid(702), username: "alice_w", email: "alice@example.com", role: "USER", is_deleted: 0, created_at: "2025-01-12T08:00:00Z" },
+  { id: uuid(703), username: "bob_test", email: "bob@test.com", role: "USER", is_deleted: 1, created_at: "2025-01-15T08:00:00Z" },
 ]
 
 // ============================================================
@@ -470,8 +462,6 @@ export const mockSiteConfig: SiteConfig = {
   contact_telegram: "@orionkey",
   contact_telegram_group: "https://t.me/+P3w53nfrAhpkMjFh",
   maintenance_enabled: false,
-  points_enabled: true,
-  points_rate: 100,
   footer_text: "Orion Key - 自动发卡平台",
   github_url: "https://github.com/orion-key/orion-key",
 }
@@ -488,8 +478,6 @@ export const mockSiteConfigKVs: SiteConfigKV[] = [
   { config_key: "contact_telegram", config_value: "@orionkey", config_group: "contact" },
   { config_key: "contact_telegram_group", config_value: "https://t.me/+P3w53nfrAhpkMjFh", config_group: "contact" },
   { config_key: "maintenance_enabled", config_value: "false", config_group: "maintenance" },
-  { config_key: "points_enabled", config_value: "true", config_group: "points" },
-  { config_key: "points_rate", config_value: "100", config_group: "points" },
   { config_key: "footer_text", config_value: "Orion Key - 自动发卡平台", config_group: "basic" },
   { config_key: "github_url", config_value: "https://github.com/orion-key/orion-key", config_group: "basic" },
 ]
@@ -506,7 +494,6 @@ export const mockRiskConfig: RiskConfig = {
   txid_submit_limit_per_order: 3,
   device_query_limit_per_hour: 20,
   device_login_limit_per_hour: 10,
-  device_register_limit_per_hour: 5,
   rate_limit_per_second: 10,
   login_attempt_limit: 5,
   max_purchase_per_user: 100,
@@ -514,16 +501,6 @@ export const mockRiskConfig: RiskConfig = {
   max_pending_orders_per_user: 3,
   order_expire_minutes: 15,
 }
-
-// ============================================================
-// Points Records
-// ============================================================
-
-export const mockPointRecords: PointRecord[] = [
-  { change_amount: 100, balance_after: 3200, reason: "新用户注册奖励", order_id: null, created_at: "2025-01-10T08:00:00Z" },
-  { change_amount: 97, balance_after: 3297, reason: "订单消费奖励", order_id: uuid(301), created_at: "2025-02-01T10:05:00Z" },
-  { change_amount: -500, balance_after: 2797, reason: "订单积分抵扣", order_id: uuid(302), created_at: "2025-02-01T14:00:00Z" },
-]
 
 // ============================================================
 // Admin Orders (extends OrderDetail with admin fields)
@@ -545,7 +522,6 @@ export const mockUser: UserProfile = {
   username: "john_doe",
   email: "john@example.com",
   role: "USER",
-  points: 3200,
   created_at: "2025-01-10T08:00:00Z",
 }
 
@@ -554,7 +530,6 @@ export const mockAdminUser: UserProfile = {
   username: "admin",
   email: "admin@orionkey.com",
   role: "ADMIN",
-  points: 0,
   created_at: "2025-01-01T00:00:00Z",
 }
 
@@ -567,10 +542,6 @@ export function mockCaptcha(): CaptchaResult {
 }
 
 export function mockLogin(): AuthResult {
-  return { token: "mock-jwt-token-" + Date.now(), user: mockUser }
-}
-
-export function mockRegister(): AuthResult {
   return { token: "mock-jwt-token-" + Date.now(), user: mockUser }
 }
 
@@ -610,16 +581,6 @@ export function mockOrderList(params?: { status?: string; page?: number; page_si
   return {
     list: filtered.slice((page - 1) * pageSize, page * pageSize),
     pagination: { page, page_size: pageSize, total: filtered.length },
-  }
-}
-
-export function mockPointsData(params?: { page?: number; page_size?: number }): PointsData {
-  const page = params?.page ?? 1
-  const pageSize = params?.page_size ?? 20
-  return {
-    total_points: 2797,
-    list: mockPointRecords.slice((page - 1) * pageSize, page * pageSize),
-    pagination: { page, page_size: pageSize, total: mockPointRecords.length },
   }
 }
 
@@ -666,8 +627,6 @@ export function mockCreateOrder(email: string, paymentMethod: string): CreateOrd
     payment_method: paymentMethod,
     created_at: now,
     email,
-    points_deducted: 0,
-    points_discount: 0,
     expires_at: expiresAt,
     paid_at: null,
     delivered_at: null,

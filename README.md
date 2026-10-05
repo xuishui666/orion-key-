@@ -38,13 +38,12 @@ Automated Digital Goods Delivery Platform
 
 ## 在线 Demo
 
-> 演示环境已开放，可直接登录管理后台体验完整功能。
+> 可访问前台演示；管理后台不提供公开登录凭据。
 
 | | 地址 |
 |---|---|
 | 🛒 **前台** | <a href="https://www.orionkey-demo.com/" target="_blank" rel="noopener noreferrer">https://www.orionkey-demo.com/</a> |
 | 🛠️ **管理后台** | <a href="https://www.orionkey-demo.com/admin" target="_blank" rel="noopener noreferrer">https://www.orionkey-demo.com/admin</a> |
-| 🔑 **管理员账号** | `admin` / `123456` |
 
 ---
 
@@ -72,9 +71,6 @@ Automated Digital Goods Delivery Platform
 | USDT (BEP-20) | BEpusdt 自托管 | 链上自动确认，无第三方托管  |
 
 > 支付架构可扩展，可通过后台「支付渠道管理」自由配置和切换。
-
-💡 **易支付入驻推荐**：<a href="https://api.niman.cn/user/?invite=X1NUVw" target="_blank" rel="noopener noreferrer">https://api.niman.cn/user/?invite=X1NUVw</a>
-> 通过该链接注册后，联系易支付客服 QQ：**26266156**（备注 **1203**），可享受永久 **3%** 超低提现手续费。
 
 ---
 
@@ -156,7 +152,7 @@ spring:
     password: ${DB_PASSWORD:your_password}
 ```
 
-首次启动自动建表（`ddl-auto: update`）。空用户库会由应用自动创建初始管理员；生产环境不要执行旧版 `data.sql` 写入账户，详见 [管理员初始化](ADMIN-BOOTSTRAP.md)。
+首次启动自动建表（`ddl-auto: update`）。空用户库需先设置私密的 `ADMIN_BOOTSTRAP_PASSWORD` 和 `PASSWORD_PLAIN=false`，应用才会创建初始管理员；`data.sql` 不再创建账户，详见 [管理员初始化](ADMIN-BOOTSTRAP.md)。
 
 ### JWT 认证
 
@@ -281,18 +277,6 @@ pnpm dev:web
 ## AI 商店推荐（非 Demo 演示）
 
 [![Orion Key Shop](https://img.shields.io/badge/Orion%20Key%20Shop-在线商店-FF6B00?style=for-the-badge)](https://www.orionkey.shop/)
-
----
-
-## TG 交流群组
-
-[![Telegram](https://img.shields.io/badge/Telegram-群组-26A5E4?logo=telegram&logoColor=white)](https://t.me/+7Gx0vtwWixI3ODZh)
-
----
-
-## 商务合作
-
-**自动发卡网代建、商务合作联系  QQ: 843676885**
 
 ---
 

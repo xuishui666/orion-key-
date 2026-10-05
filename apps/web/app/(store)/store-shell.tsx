@@ -120,7 +120,7 @@ function PopupAnnouncement() {
 }
 
 /** Routes that are always accessible even in maintenance mode */
-const MAINTENANCE_EXEMPT_PATHS = ["/login", "/register"]
+const MAINTENANCE_EXEMPT_PATHS = ["/login"]
 
 interface StoreShellProps {
   siteName: string
@@ -158,4 +158,3 @@ export function StoreShell({ siteName, children }: StoreShellProps) {
     </div>
   )
 }
-

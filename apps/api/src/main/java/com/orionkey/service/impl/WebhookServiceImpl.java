@@ -10,6 +10,7 @@ import com.orionkey.entity.PaymentChannel;
 import com.orionkey.entity.WebhookEvent;
 import com.orionkey.repository.OrderRepository;
 import com.orionkey.repository.PaymentChannelRepository;
+import com.orionkey.repository.UnmatchedTransactionRepository;
 import com.orionkey.repository.WebhookEventRepository;
 import com.orionkey.service.BepusdtService;
 import com.orionkey.service.EpayService;
@@ -35,6 +36,7 @@ public class WebhookServiceImpl implements WebhookService {
     private final WebhookEventRepository webhookEventRepository;
     private final OrderRepository orderRepository;
     private final PaymentChannelRepository paymentChannelRepository;
+    private final UnmatchedTransactionRepository unmatchedTransactionRepository;
     private final EpayService epayService;
     private final BepusdtService bepusdtService;
     private final ObjectMapper objectMapper;
@@ -291,6 +293,13 @@ public class WebhookServiceImpl implements WebhookService {
         if (txidExisting.isPresent() && !txidExisting.get().getId().equals(order.getId())) {
             log.error("BEpusdt callback TXID collision: txid={} already used by order {}, current order {}",
                     blockTxId, txidExisting.get().getId(), order.getId());
+            saveWebhookEvent(eventId, "usdt", order.getId(), signParams.toString(), "TXID_ALREADY_USED");
+            return "ok";
+        }
+        if (unmatchedTransactionRepository.findByTxid(blockTxId)
+                .filter(ut -> "PURGED_ORDER".equals(ut.getSource()))
+                .isPresent()) {
+            log.error("BEpusdt callback TXID already used by a purged order: txid={}", blockTxId);
             saveWebhookEvent(eventId, "usdt", order.getId(), signParams.toString(), "TXID_ALREADY_USED");
             return "ok";
         }

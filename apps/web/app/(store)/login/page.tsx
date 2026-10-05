@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff, LogIn } from "lucide-react"
 import { toast } from "sonner"
@@ -157,12 +156,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            {t("auth.noAccount")}{" "}
-            <Link href="/register" className="font-medium text-primary hover:underline">
-              {t("auth.goRegister")}
-            </Link>
-          </p>
         </div>
       </div>
     </div>

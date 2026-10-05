@@ -1,12 +1,10 @@
 package com.orionkey.service.impl;
 
 import com.orionkey.constant.ErrorCode;
-import com.orionkey.constant.UserRole;
 import com.orionkey.entity.CartItem;
 import com.orionkey.entity.User;
 import com.orionkey.exception.BusinessException;
 import com.orionkey.model.request.LoginRequest;
-import com.orionkey.model.request.RegisterRequest;
 import com.orionkey.model.response.AuthResponse;
 import com.orionkey.model.response.CaptchaResponse;
 import com.orionkey.model.response.UserProfileResponse;
@@ -40,30 +38,6 @@ public class AuthServiceImpl implements AuthService {
     public CaptchaResponse generateCaptcha() {
         CaptchaUtils.CaptchaResult result = captchaUtils.generate();
         return new CaptchaResponse(result.captchaId(), result.imageBase64());
-    }
-
-    @Override
-    @Transactional
-    public AuthResponse register(RegisterRequest request) {
-        if (!captchaUtils.verify(request.getCaptchaId(), request.getCaptcha())) {
-            throw new BusinessException(ErrorCode.CAPTCHA_INVALID, "验证码错误或已过期");
-        }
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new BusinessException(ErrorCode.USERNAME_EXISTS, "用户名已存在");
-        }
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new BusinessException(ErrorCode.EMAIL_EXISTS, "该邮箱已注册");
-        }
-
-        User user = new User();
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
-        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        user.setRole(UserRole.USER);
-        userRepository.save(user);
-
-        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getRole().name());
-        return new AuthResponse(token, UserProfileResponse.from(user));
     }
 
     /** 连续登录失败上限 */
