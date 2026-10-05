@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
-import { ShoppingCart, User, Menu, X, Globe, Moon, Sun, Package, Search, Settings, ChevronDown, SlidersHorizontal, LogOut, ClipboardList } from "lucide-react"
+import { ShoppingCart, User, LogIn, Menu, X, Globe, Moon, Sun, Package, Search, Settings, ChevronDown, SlidersHorizontal, LogOut, ClipboardList } from "lucide-react"
 import { useAuth, useLocale, useTheme, useColorScheme, useSearch, useCart, useSiteConfig, COLOR_SCHEMES, type SortKey } from "@/lib/context"
 import { cn } from "@/lib/utils"
 
@@ -238,8 +238,10 @@ export function StoreHeader({ siteName }: StoreHeaderProps) {
             )}
           </Link>
 
-          {/* User / Auth — auth 未就绪时显示占位，避免登录按钮闪烁 */}
-          {authLoaded && isLoggedIn && user?.role === "ADMIN" && (
+          {/* User / Auth */}
+          {!authLoaded ? (
+            <div className="h-9 w-9 animate-pulse rounded-md bg-muted" />
+          ) : isLoggedIn && user?.role === "ADMIN" ? (
             <div className="relative">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -266,6 +268,11 @@ export function StoreHeader({ siteName }: StoreHeaderProps) {
                 </>
               )}
             </div>
+          ) : (
+            <Link href="/login" aria-label={t("nav.login")} className="inline-flex h-9 items-center rounded-md bg-primary px-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 sm:px-4">
+              <LogIn className="h-4 w-4 sm:hidden" />
+              <span className="hidden sm:inline">{t("nav.login")}</span>
+            </Link>
           )}
 
           {/* Mobile Menu Toggle */}

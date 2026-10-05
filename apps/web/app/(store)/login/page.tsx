@@ -53,7 +53,7 @@ export default function LoginPage() {
       await refreshCart()
 
       toast.success(t("auth.loginSuccess"))
-      router.push(redirectTo || "/")
+      router.push(redirectTo || "/admin/dashboard")
     } catch (err: unknown) {
       toast.error(getApiErrorMessage(err, t))
       handleTurnstileReset()
