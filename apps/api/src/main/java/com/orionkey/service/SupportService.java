@@ -9,6 +9,7 @@ import com.orionkey.repository.SupportConversationRepository;
 import com.orionkey.repository.SupportImageRepository;
 import com.orionkey.repository.SupportMessageRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,12 +26,28 @@ import java.util.Collections;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class SupportService {
     private static final SecureRandom RANDOM = new SecureRandom();
     public static final int MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+    private static final List<UnsafeContentRule> UNSAFE_CUSTOMER_CONTENT = List.of(
+            new UnsafeContentRule("JNDI_LOOKUP", Pattern.compile(
+                    "(?i)\\$\\{\\s*(?:jndi|lower|upper|env|sys):|\\b(?:ldap|ldaps|rmi|iiop)\\s*://")),
+            new UnsafeContentRule("SCRIPT_INJECTION", Pattern.compile(
+                    "(?i)<\\s*script\\b|<[^>]{0,512}\\s+on[a-z]{2,32}\\s*=|<\\s*svg/onload\\s*=|javascript\\s*:")),
+            new UnsafeContentRule("TEMPLATE_INJECTION", Pattern.compile(
+                    "(?is)(?:[$%]\\{|\\{\\{|<%|\\{%)[^\\r\\n]{0,128}(?:\\d\\s*[-+*/]\\s*\\d|jndi|class|request|config|self|__)[^\\r\\n]{0,128}(?:\\}|%>)")),
+            new UnsafeContentRule("SQL_INJECTION", Pattern.compile(
+                    "(?i)\\b(?:union\\s+(?:all\\s+)?select|drop\\s+table|information_schema|sleep\\s*\\(|benchmark\\s*\\()")),
+            new UnsafeContentRule("PATH_TRAVERSAL", Pattern.compile(
+                    "(?i)(?:\\.\\./|%2e%2e(?:%2f|/)|/etc/passwd|\\\\(?:windows\\\\)?system32)")),
+            new UnsafeContentRule("COMMAND_INJECTION", Pattern.compile(
+                    "(?i)(?:\\b(?:curl|wget)\\s+https?://|\\b(?:powershell(?:\\.exe)?\\s+-|cmd\\.exe\\s+/)|\\bbase64\\s+-d\\b)"))
+    );
     private final SupportConversationRepository conversations;
     private final SupportMessageRepository messages;
     private final SupportImageRepository images;
@@ -43,6 +60,9 @@ public class SupportService {
 
     @Transactional
     public CreatedConversation create(String email, String orderReference, String text) {
+        rejectUnsafeCustomerText(text, null);
+        rejectUnsafeCustomerText(email, null);
+        rejectUnsafeCustomerText(orderReference, null);
         byte[] secret = new byte[32];
         RANDOM.nextBytes(secret);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(secret);
@@ -188,6 +208,9 @@ public class SupportService {
         if (text == null || text.isBlank() || text.length() > 2000) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "消息长度需为 1 到 2000 字");
         }
+        if (sender == SupportMessage.Sender.CUSTOMER) {
+            rejectUnsafeCustomerText(text, conversation.getId());
+        }
         SupportMessage message = new SupportMessage();
         message.setConversationId(conversation.getId());
         message.setSender(sender);
@@ -199,6 +222,28 @@ public class SupportService {
         conversations.save(conversation);
         return new MessageView(message.getId(), sender.name(), message.getText(), false, message.getCreatedAt());
     }
+
+    static String unsafeCustomerContentCategory(String text) {
+        if (text == null || text.isBlank()) return null;
+        return UNSAFE_CUSTOMER_CONTENT.stream()
+                .filter(rule -> rule.pattern().matcher(text).find())
+                .map(UnsafeContentRule::category)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static void rejectUnsafeCustomerText(String text, UUID conversationId) {
+        if (text != null && text.length() > 2000) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "消息长度不能超过 2000 字");
+        }
+        String category = unsafeCustomerContentCategory(text);
+        if (category == null) return;
+        log.warn("Blocked unsafe customer support content: category={}, conversationId={}, length={}",
+                category, conversationId == null ? "new" : conversationId, text.length());
+        throw new BusinessException(ErrorCode.BAD_REQUEST, "消息包含不允许的内容");
+    }
+
+    private record UnsafeContentRule(String category, Pattern pattern) {}
 
     private SupportConversation find(UUID id) {
         return conversations.findById(id)

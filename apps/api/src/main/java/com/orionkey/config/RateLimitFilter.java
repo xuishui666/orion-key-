@@ -88,7 +88,7 @@ public class RateLimitFilter implements Filter {
                     ? deviceId : clientIp;
             String supportKey = (creating ? "support-create:" : "support-message:") + supportIdentity;
             TokenBucket supportBucket = supportBuckets.computeIfAbsent(supportKey,
-                    k -> new TokenBucket(creating ? 10 : 60, 3_600_000));
+                    k -> new TokenBucket(10, 3_600_000));
             if (!supportBucket.tryConsume()) {
                 rejectTooManyRequests(response, "客服消息发送过于频繁，请稍后再试");
                 return;
