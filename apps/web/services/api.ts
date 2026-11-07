@@ -152,6 +152,32 @@ if (typeof window !== "undefined") {
 
 type ApiRequestOptions = RequestInit & { turnstileToken?: string }
 
+type OrderProof = { token?: string; email?: string; password?: string }
+const orderProofs = new Map<string, OrderProof>()
+
+function proofForOrder(id: string): OrderProof {
+  id = id.toLowerCase()
+  const token = safeStorageGet("localStorage", `order_access_${id}`)
+  return { ...orderProofs.get(id), ...(token ? { token } : {}) }
+}
+
+function encodeOrderProof(proof: OrderProof): string {
+  const bytes = new TextEncoder().encode(JSON.stringify(proof))
+  return btoa(Array.from(bytes, byte => String.fromCharCode(byte)).join(""))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+}
+
+async function createProtectedOrder(path: string, data: CreateOrderRequest | CreateCartOrderRequest, turnstileToken?: string) {
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, "0")).join("")
+  const result = await request<CreateOrderResult>(path, {
+    method: "POST", body: JSON.stringify({ ...data, access_token: token }), turnstileToken,
+  })
+  const id = result.payment.order_id
+  orderProofs.set(id, { token })
+  safeStorageSet("localStorage", `order_access_${id}`, token)
+  return result
+}
+
 async function request<T>(
   path: string,
   options: ApiRequestOptions = {}
@@ -179,6 +205,9 @@ async function request<T>(
   if (turnstileToken) {
     headers["X-Turnstile-Token"] = turnstileToken
   }
+
+  const orderId = path.match(/^\/orders\/([a-f0-9-]{36})\//i)?.[1]
+  if (orderId) headers["X-Order-Proof"] = encodeOrderProof(proofForOrder(orderId))
 
   const res = await fetch(`${API_BASE}${path}`, {
     ...fetchOptions,
@@ -327,17 +356,29 @@ export const cartApi = {
 
 export const orderApi = {
   create: (data: CreateOrderRequest, turnstileToken?: string) =>
-    request<CreateOrderResult>("/orders", { method: "POST", body: JSON.stringify(data), turnstileToken }),
+    createProtectedOrder("/orders", data, turnstileToken),
   createFromCart: (data: CreateCartOrderRequest, turnstileToken?: string) =>
-    request<CreateOrderResult>("/orders/from-cart", { method: "POST", body: JSON.stringify(data), turnstileToken }),
+    createProtectedOrder("/orders/from-cart", data, turnstileToken),
   getStatus: (orderId: string) =>
     request<{ order_id: string; status: OrderStatus; expires_at: string; remaining_seconds: number; payment_url?: string; qrcode_url?: string; payment_method?: string; pay_url?: string; wallet_address?: string; crypto_amount?: string; chain?: string }>(`/orders/${orderId}/status`),
   refreshStatus: (orderId: string) =>
     request<{ status: OrderStatus }>(`/orders/${orderId}/refresh`, { method: "POST" }),
-  query: (data: { order_ids?: string[]; emails?: string[] }) =>
-    request<OrderBrief[]>("/orders/query", { method: "POST", body: JSON.stringify(data) }),
+  query: async (data: { order_ids?: string[]; emails?: string[]; lookup_password?: string }) => {
+    const credentials = Object.fromEntries((data.order_ids || []).map(id => [id, encodeOrderProof({
+      ...proofForOrder(id), ...(data.lookup_password ? { password: data.lookup_password } : {}),
+    })]))
+    const result = await request<OrderBrief[]>("/orders/query", {
+      method: "POST", body: JSON.stringify({ ...data, order_credentials: credentials }),
+    })
+    if (data.lookup_password) {
+      result.forEach(order => orderProofs.set(order.id, { email: data.emails?.[0], password: data.lookup_password }))
+    }
+    return result
+  },
   deliver: (data: { order_ids: string[] }) =>
-    request<DeliverResult[]>("/orders/deliver", { method: "POST", body: JSON.stringify(data) }),
+    request<DeliverResult[]>("/orders/deliver", { method: "POST", body: JSON.stringify({
+      ...data, order_credentials: Object.fromEntries(data.order_ids.map(id => [id, encodeOrderProof(proofForOrder(id))])),
+    }) }),
   exportKeys: (orderId: string) =>
     request<string>(`/orders/${orderId}/export`),
   submitTxid: (orderId: string, txid: string) =>
@@ -566,6 +607,7 @@ export const supportApi = {
 }
 
 export const adminSupportApi = {
+  delete: (id: string) => request<null>(`/admin/support/${id}`, { method: "DELETE" }),
   list: () => request<SupportConversation[]>("/admin/support"),
   get: (id: string) => request<SupportConversation>(`/admin/support/${id}`),
   send: (id: string, text: string) =>
@@ -721,4 +763,3 @@ export function getApiErrorMessage(err: unknown, t: (key: any) => string): strin
   }
   return err instanceof Error ? (err.message?.trim() || fallback) : fallback
 }
-

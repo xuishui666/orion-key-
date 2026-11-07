@@ -1,10 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useState, type FormEvent } from "react"
-import { RefreshCw, Send } from "lucide-react"
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
+import { RefreshCw, Send, Trash2 } from "lucide-react"
 import { adminSupportApi, getApiErrorMessage, type SupportConversation } from "@/services/api"
 import { SupportImage } from "@/components/store/support-image"
 import { useLocale } from "@/lib/context"
+import { Modal } from "@/components/ui/modal"
 
 export default function AdminSupportPage() {
   const { locale, t } = useLocale()
@@ -15,21 +16,30 @@ export default function AdminSupportPage() {
   const [text, setText] = useState("")
   const [sending, setSending] = useState(false)
   const [error, setError] = useState("")
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const deleted = useRef(new Set<string>())
+  const activeSelection = useRef(selectedId)
+  activeSelection.current = selectedId
 
   const refreshList = useCallback(async () => {
     try {
       const result = await adminSupportApi.list()
-      setList(result)
-      setSelectedId(current => current || result[0]?.id || null)
+      const remaining = result.filter(item => !deleted.current.has(item.id))
+      setList(remaining)
+      setSelectedId(current => remaining.some(item => item.id === current) ? current : remaining[0]?.id || null)
     } catch (err) { setError(getApiErrorMessage(err, t)) }
   }, [t])
 
   const refreshConversation = useCallback(async () => {
     if (!selectedId) return
     try {
-      setConversation(await adminSupportApi.get(selectedId))
-      setError("")
-    } catch (err) { setError(getApiErrorMessage(err, t)) }
+      const result = await adminSupportApi.get(selectedId)
+      if (activeSelection.current === selectedId && !deleted.current.has(selectedId)) {
+        setConversation(result)
+        setError("")
+      }
+    } catch (err) { if (!deleted.current.has(selectedId)) setError(getApiErrorMessage(err, t)) }
   }, [selectedId, t])
 
   useEffect(() => { refreshList() }, [refreshList])
@@ -52,11 +62,33 @@ export default function AdminSupportPage() {
     finally { setSending(false) }
   }
 
+  async function removeConversation() {
+    if (!deleteId || deleting) return
+    const id = deleteId
+    setDeleting(true)
+    try {
+      await adminSupportApi.delete(id)
+      deleted.current.add(id)
+      activeSelection.current = null
+      setConversation(null)
+      setSelectedId(null)
+      setText("")
+      setError("")
+      setList(current => current.filter(item => item.id !== id))
+      setDeleteId(null)
+      await refreshList()
+    } catch (err) { setError(getApiErrorMessage(err, t)); setDeleteId(null) }
+    finally { setDeleting(false) }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">{zh ? "客服会话" : "Support"}</h1>
-        <button type="button" onClick={() => { refreshList(); refreshConversation() }} title={zh ? "刷新" : "Refresh"} aria-label={zh ? "刷新" : "Refresh"} className="rounded-md border border-border p-2"><RefreshCw className="h-4 w-4" /></button>
+        <div className="flex gap-2">
+          <button type="button" disabled={!selectedId || deleting || sending} onClick={() => setDeleteId(selectedId)} title={zh ? "删除所选会话" : "Delete selected conversation"} aria-label={zh ? "删除所选会话" : "Delete selected conversation"} className="rounded-md border border-border p-2 text-destructive disabled:opacity-40"><Trash2 className="h-4 w-4" /></button>
+          <button type="button" onClick={() => { refreshList(); refreshConversation() }} title={zh ? "刷新" : "Refresh"} aria-label={zh ? "刷新" : "Refresh"} className="rounded-md border border-border p-2"><RefreshCw className="h-4 w-4" /></button>
+        </div>
       </div>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <div className="grid gap-4 md:grid-cols-[260px_minmax(0,1fr)]">
@@ -95,6 +127,17 @@ export default function AdminSupportPage() {
           ) : <p className="p-4 text-sm text-muted-foreground">{zh ? "选择会话查看消息" : "Select a conversation"}</p>}
         </div>
       </div>
+      <Modal open={deleteId !== null} onClose={() => { if (!deleting) setDeleteId(null) }} className="max-w-sm rounded-lg p-5">
+        <div role="alertdialog" aria-modal="true" aria-labelledby="delete-support-title" aria-describedby="delete-support-description">
+          <h2 id="delete-support-title" className="text-base font-semibold">{zh ? "彻底删除此会话？" : "Delete this conversation permanently?"}</h2>
+          <p className="mt-2 break-all text-sm text-muted-foreground">{deleteId?.slice(0, 12)}</p>
+          <p id="delete-support-description" className="mt-2 text-sm text-muted-foreground">{zh ? "会话内所有消息和图片将被删除，无法恢复。Telegram 中已有消息仍会保留。" : "All messages and images will be permanently deleted. Existing Telegram messages remain."}</p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button type="button" disabled={deleting} onClick={() => setDeleteId(null)} className="rounded-md border border-border px-3 py-2 text-sm">{zh ? "取消" : "Cancel"}</button>
+            <button type="button" disabled={deleting} onClick={removeConversation} className="rounded-md bg-destructive px-3 py-2 text-sm text-destructive-foreground disabled:opacity-50">{deleting ? (zh ? "删除中…" : "Deleting…") : (zh ? "彻底删除" : "Delete permanently")}</button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

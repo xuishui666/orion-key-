@@ -10,6 +10,7 @@ import { mockCreateOrder } from "@/lib/mock-data"
 import { Turnstile, useTurnstile } from "@/components/shared/turnstile"
 import { cn, validateEmail, generateIdempotencyKey, getCurrencySymbol, detectPaymentDevice } from "@/lib/utils"
 import { PaymentSelector } from "@/components/shared/payment-selector"
+import { OrderLookupPassword } from "@/components/shared/order-lookup-password"
 import type { ProductDetail, ProductSpec, PaymentChannelItem } from "@/types"
 
 interface ProductActionsProps {
@@ -31,6 +32,7 @@ export function ProductActions({ product, channels }: ProductActionsProps) {
   )
   const [quantity, setQuantity] = useState(1)
   const [email, setEmail] = useState("")
+  const [lookupPassword, setLookupPassword] = useState("")
   const [emailError, setEmailError] = useState("")
   const [selectedPayment, setSelectedPayment] = useState(
     enabledChannels.length > 0 ? enabledChannels[0].channel_code : ""
@@ -54,6 +56,10 @@ export function ProductActions({ product, channels }: ProductActionsProps) {
   }
 
   const handleBuyNow = async () => {
+    if (lookupPassword.length < 8 || new TextEncoder().encode(lookupPassword).length > 72) {
+      toast.error("请设置至少 8 位查询密码（最多 72 字节）")
+      return
+    }
     if (!email.trim()) {
       toast.error(t("product.emailRequired"))
       emailInputRef.current?.focus()
@@ -88,6 +94,7 @@ export function ProductActions({ product, channels }: ProductActionsProps) {
           spec_id: selectedSpec?.id ?? null,
           quantity,
           email,
+          lookup_password: lookupPassword,
           payment_method: selectedPayment,
           idempotency_key: generateIdempotencyKey(),
           device,
@@ -280,6 +287,8 @@ export function ProductActions({ product, channels }: ProductActionsProps) {
             )}
           </div>
         </div>
+
+        <OrderLookupPassword value={lookupPassword} onChange={setLookupPassword} />
 
         {/* Payment method */}
         <div>

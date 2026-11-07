@@ -20,6 +20,11 @@ import java.util.UUID;
 @Table(name = "orders")
 public class Order extends BaseEntity {
 
+    // A stale callback must roll back instead of overwriting a newer payment/delivery state.
+    @Version
+    @Column(nullable = false, columnDefinition = "bigint default 0")
+    private long version;
+
     private UUID userId;
 
     private String email;
@@ -63,6 +68,10 @@ public class Order extends BaseEntity {
     private String clientIp;
 
     private String sessionToken;
+
+    private String accessTokenHash;
+
+    private String lookupPasswordHash;
 
     @Column(columnDefinition = "TEXT")
     private String paymentUrl;

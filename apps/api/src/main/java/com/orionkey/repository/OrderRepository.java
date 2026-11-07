@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface OrderRepository extends JpaRepository<Order, UUID> {
+    List<Order> findTop20ByEmailIgnoreCaseAndIsDeletedOrderByCreatedAtDesc(String email, int isDeleted);
     @Query("SELECT o FROM Order o WHERE o.status IN (com.orionkey.constant.OrderStatus.PAID, com.orionkey.constant.OrderStatus.DELIVERED) AND o.paidAt >= :start AND o.paidAt < :end")
     List<Order> findPaidInRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
     @Modifying

@@ -13,6 +13,9 @@ import java.util.UUID;
 
 public interface SupportMessageRepository extends JpaRepository<SupportMessage, UUID> {
     @Modifying
+    @Query("delete from SupportMessage m where m.conversationId = :id")
+    int deleteByConversation(@Param("id") UUID id);
+    @Modifying
     @Query("delete from SupportMessage m where m.createdAt < :cutoff")
     int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff);
 

@@ -31,6 +31,7 @@ public class OrderController {
     private final UnmatchedTransactionRepository unmatchedTransactionRepository;
     private final TxidVerifyService txidVerifyService;
     private final com.orionkey.service.PaymentService paymentService;
+    private final com.orionkey.service.OrderAccessService orderAccess;
 
     @PostMapping
     public ApiResponse<?> createOrder(@RequestBody Map<String, Object> request,
@@ -49,27 +50,33 @@ public class OrderController {
     }
 
     @GetMapping("/{id}/status")
-    public ApiResponse<?> getOrderStatus(@PathVariable UUID id) {
+    public ApiResponse<?> getOrderStatus(@PathVariable UUID id, HttpServletRequest request) {
+        orderAccess.authorize(id, request);
         return ApiResponse.success(orderService.getOrderStatus(id));
     }
 
     @PostMapping("/{id}/refresh")
-    public ApiResponse<?> refreshOrderStatus(@PathVariable UUID id) {
+    public ApiResponse<?> refreshOrderStatus(@PathVariable UUID id, HttpServletRequest request) {
+        orderAccess.authorize(id, request);
         return ApiResponse.success(orderService.refreshOrderStatus(id));
     }
 
     @PostMapping("/query")
-    public ApiResponse<?> queryOrders(@RequestBody Map<String, Object> request) {
-        return ApiResponse.success(deliverService.queryOrders(request));
+    public ApiResponse<?> queryOrders(@RequestBody Map<String, Object> request, HttpServletRequest httpRequest) {
+        var ids = orderAccess.resolveQuery(request, httpRequest);
+        return ApiResponse.success(deliverService.queryOrders(Map.of("order_ids", ids)));
     }
 
     @PostMapping("/deliver")
-    public ApiResponse<?> deliverOrders(@RequestBody Map<String, Object> request) {
-        return ApiResponse.success(deliverService.deliverOrders(request));
+    public ApiResponse<?> deliverOrders(@RequestBody Map<String, Object> request, HttpServletRequest httpRequest) {
+        var ids = orderAccess.authorizeBatch(request, httpRequest);
+        return ApiResponse.success(deliverService.deliverOrders(Map.of("order_ids", ids)));
     }
 
     @GetMapping("/{id}/export")
-    public void exportCardKeys(@PathVariable UUID id, HttpServletResponse response) throws Exception {
+    public void exportCardKeys(@PathVariable UUID id, HttpServletRequest request, HttpServletResponse response) throws Exception {
+        orderAccess.authorize(id, request);
+        response.setHeader("Cache-Control", "no-store");
         String content = deliverService.exportCardKeys(id);
         response.setContentType("text/plain; charset=UTF-8");
         response.setHeader("Content-Disposition", "attachment; filename=card-keys-" + id + ".txt");
@@ -81,7 +88,8 @@ public class OrderController {
      */
     @PostMapping("/{id}/repay")
     public ApiResponse<?> repayOrder(@PathVariable UUID id,
-                                     @RequestBody(required = false) Map<String, String> body) {
+                                     @RequestBody(required = false) Map<String, String> body, HttpServletRequest request) {
+        orderAccess.authorize(id, request);
         String device = body != null ? body.get("device") : null;
         return ApiResponse.success(paymentService.repay(id, device, RequestContext.getUserId()));
     }
@@ -90,7 +98,8 @@ public class OrderController {
      * 用户提交 TXID 进行自动链上验证（USDT 补单）     */
     @PostMapping("/{id}/txid-verify")
     public ApiResponse<?> submitTxidForVerification(@PathVariable UUID id,
-                                                     @RequestBody Map<String, String> request) {
+                                                     @RequestBody Map<String, String> request, HttpServletRequest httpRequest) {
+        orderAccess.authorize(id, httpRequest);
         String txid = request.get("txid");
         if (txid == null || txid.isBlank()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请提供交易哈希（TXID）");

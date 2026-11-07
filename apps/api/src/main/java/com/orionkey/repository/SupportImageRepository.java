@@ -11,6 +11,9 @@ import java.util.UUID;
 
 public interface SupportImageRepository extends JpaRepository<SupportImage, UUID> {
     @Modifying
+    @Query("delete from SupportImage i where i.messageId in (select m.id from SupportMessage m where m.conversationId = :id)")
+    int deleteByConversation(@Param("id") UUID id);
+    @Modifying
     @Query("delete from SupportImage i where i.messageId in (select m.id from SupportMessage m where m.createdAt < :cutoff)")
     int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff);
 }

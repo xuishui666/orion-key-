@@ -41,6 +41,8 @@ export default function OrderQueryPage() {
   const { config } = useSiteConfig()
   const searchParams = useSearchParams()
   const [queryValue, setQueryValue] = useState("")
+  const [lookupPassword, setLookupPassword] = useState("")
+  const [queryError, setQueryError] = useState("")
   const [orders, setOrders] = useState<OrderBrief[]>([])
   const [deliverResults, setDeliverResults] = useState<DeliverResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
@@ -86,6 +88,7 @@ export default function OrderQueryPage() {
     }
 
     setIsSearching(true)
+    setQueryError("")
     setOrders([])
     setDeliverResults([])
 
@@ -93,8 +96,8 @@ export default function OrderQueryPage() {
       // Determine if input is email or order ID
       const isEmail = trimmed.includes("@")
       const queryParams = isEmail
-        ? { emails: [trimmed] }
-        : { order_ids: [trimmed] }
+        ? { emails: [trimmed], lookup_password: lookupPassword }
+        : { order_ids: [trimmed], lookup_password: lookupPassword }
 
       const found = await withMockFallback(
         () => orderApi.query(queryParams),
@@ -106,10 +109,12 @@ export default function OrderQueryPage() {
       let finalDeliver: Awaited<ReturnType<typeof orderApi.deliver>> = []
       const deliverableIds = found.filter(o => o.status === "PAID" || o.status === "DELIVERED").map(o => o.id)
       if (deliverableIds.length > 0) {
-        finalDeliver = await withMockFallback(
-          () => orderApi.deliver({ order_ids: deliverableIds }),
-          () => mockDeliver(deliverableIds)
-        )
+        try {
+          finalDeliver = await withMockFallback(
+            () => orderApi.deliver({ order_ids: deliverableIds }),
+            () => mockDeliver(deliverableIds)
+          )
+        } catch (err) { setQueryError(getApiErrorMessage(err, t)) }
         // deliver 可能将 PAID 变为 DELIVERED，同步更新状态
         const statusMap = new Map(finalDeliver.map(d => [d.order_id, d.status]))
         finalOrders = found.map(o => {
@@ -133,13 +138,13 @@ export default function OrderQueryPage() {
         })
       }
 
-    } catch {
-      // fallback already handled by withMockFallback
+    } catch (err) {
+      setQueryError(getApiErrorMessage(err, t))
     } finally {
       setSearched(true)
       setIsSearching(false)
     }
-  }, [])
+  }, [lookupPassword, t])
 
   const handleSearch = useCallback((value?: string) => {
     doSearch(value || queryValue)
@@ -244,6 +249,10 @@ export default function OrderQueryPage() {
 
       {/* Search Form */}
       <div className="rounded-lg border border-border bg-card p-4">
+        <label htmlFor="lookup-password" className="mb-1.5 block text-sm font-medium">查询密码</label>
+        <input id="lookup-password" type="password" autoComplete="current-password" maxLength={72}
+          value={lookupPassword} onChange={event => setLookupPassword(event.target.value)}
+          className="mb-3 h-10 w-full rounded-md border border-input bg-background px-3 text-sm" />
         <div className="flex gap-2">
           <div className="relative flex-1">
             <input
@@ -278,6 +287,8 @@ export default function OrderQueryPage() {
             {t("order.search")}
           </button>
         </div>
+        {queryError && <p role="alert" className="mt-3 text-sm text-destructive">{queryError}</p>}
+        <p className="mt-2 text-xs text-muted-foreground">跨设备查询需提供下单时设置的查询密码。旧订单或忘记密码请联系客服核实支付记录。</p>
       </div>
 
       {/* Results — 有查询结果时优先展示在最近订单上方 */}

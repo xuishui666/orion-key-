@@ -40,6 +40,7 @@ public class OrderServiceImpl implements OrderService {
     private final PaymentChannelRepository paymentChannelRepository;
     private final PaymentService paymentService;
     private final PlatformTransactionManager transactionManager;
+    private final com.orionkey.service.OrderAccessService orderAccess;
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -58,9 +59,7 @@ public class OrderServiceImpl implements OrderService {
             if (existing.isPresent()) {
                 Order existingOrder = existing.get();
                 // F13: 幂等归属校验 — 确保是同一用户/会话的请求，防止通过幂等键探测他人订单
-                boolean sameOwner = (userId != null && userId.equals(existingOrder.getUserId()))
-                        || (userId == null && existingOrder.getUserId() == null
-                            && Objects.equals(sessionToken, existingOrder.getSessionToken()));
+                boolean sameOwner = orderAccess.ownsCreation(existingOrder, req);
                 if (sameOwner) {
                     return existingOrder;
                 }
@@ -121,6 +120,7 @@ public class OrderServiceImpl implements OrderService {
         order.setIdempotencyKey(idempotencyKey);
         order.setClientIp(clientIp);
         order.setSessionToken(sessionToken);
+        orderAccess.initialize(order, req);
         orderRepository.save(order);
 
         String specName = null;
@@ -159,9 +159,7 @@ public class OrderServiceImpl implements OrderService {
             Optional<Order> existing = orderRepository.findByIdempotencyKey(idempotencyKey);
             if (existing.isPresent()) {
                 Order existingOrder = existing.get();
-                boolean sameOwner = (userId != null && userId.equals(existingOrder.getUserId()))
-                        || (userId == null && existingOrder.getUserId() == null
-                            && Objects.equals(sessionToken, existingOrder.getSessionToken()));
+                boolean sameOwner = orderAccess.ownsCreation(existingOrder, req);
                 if (sameOwner) {
                     return existingOrder;
                 }
@@ -210,6 +208,7 @@ public class OrderServiceImpl implements OrderService {
         order.setIdempotencyKey(idempotencyKey);
         order.setClientIp(clientIp);
         order.setSessionToken(sessionToken);
+        orderAccess.initialize(order, req);
         orderRepository.save(order);
 
         for (CartItem ci : cartItems) {

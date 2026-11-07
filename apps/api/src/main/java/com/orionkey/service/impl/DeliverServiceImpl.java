@@ -111,6 +111,7 @@ public class DeliverServiceImpl implements DeliverService {
     private Map<String, Object> deliverSingleOrder(UUID orderId) {
         // F2: 悲观锁 — 防止同一 PAID 订单被并发请求重复发货分配双份卡密
         Order order = orderRepository.findByIdForUpdate(orderId)
+                .filter(o -> o.getIsDeleted() == 0)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND, "订单不存在"));
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -135,8 +136,7 @@ public class DeliverServiceImpl implements DeliverService {
                         return result;
                     }
                 }
-                try {
-                    List<CardKey> allAllocated = new ArrayList<>();
+                // Let stock failures escape so Spring rolls back every allocation in this transaction.
                     for (OrderItem item : items) {
                         List<CardKey> keys = cardKeyRepository.findAndLockAvailable(
                                 item.getProductId(), item.getSpecId(), item.getQuantity());
@@ -150,7 +150,6 @@ public class DeliverServiceImpl implements DeliverService {
                             key.setSoldAt(LocalDateTime.now());
                             cardKeyRepository.save(key);
                         }
-                        allAllocated.addAll(keys);
                     }
 
                     order.setStatus(OrderStatus.DELIVERED);
@@ -167,11 +166,6 @@ public class DeliverServiceImpl implements DeliverService {
 
                     result.put("status", "DELIVERED");
                     result.put("groups", buildCardKeyGroups(orderId));
-                } catch (BusinessException e) {
-                    result.put("status", "PAID");
-                    result.put("groups", List.of());
-                    log.warn("Deliver failed for order {}: {}", orderId, e.getMessage());
-                }
             }
             case PENDING -> {
                 result.put("status", "PENDING");

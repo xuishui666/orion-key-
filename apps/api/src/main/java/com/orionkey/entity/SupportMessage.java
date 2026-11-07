@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -23,6 +24,9 @@ import java.util.UUID;
                 @UniqueConstraint(name = "uq_support_tg_update", columnNames = "telegram_update_id")
         })
 public class SupportMessage extends BaseEntity {
+    @Version
+    @Column(nullable = false, columnDefinition = "bigint default 0")
+    private long version;
     public enum Sender { CUSTOMER, ADMIN }
 
     @Column(nullable = false)

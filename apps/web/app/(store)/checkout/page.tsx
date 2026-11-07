@@ -9,6 +9,7 @@ import { orderApi, paymentApi, withMockFallback, getApiErrorMessage } from "@/se
 import { mockPaymentChannels, mockCreateOrder } from "@/lib/mock-data"
 import { validateEmail, generateIdempotencyKey, getCurrencySymbol, detectPaymentDevice } from "@/lib/utils"
 import { PaymentSelector } from "@/components/shared/payment-selector"
+import { OrderLookupPassword } from "@/components/shared/order-lookup-password"
 import { Turnstile, useTurnstile } from "@/components/shared/turnstile"
 import type { PaymentChannelItem } from "@/types"
 
@@ -18,6 +19,7 @@ export default function CheckoutPage() {
   const { items, totalAmount, itemCount, refreshCart } = useCart()
 
   const [email, setEmail] = useState("")
+  const [lookupPassword, setLookupPassword] = useState("")
   const [channels, setChannels] = useState<PaymentChannelItem[]>([])
   const [selectedPayment, setSelectedPayment] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -49,6 +51,10 @@ export default function CheckoutPage() {
   }, [])
 
   const handleConfirmOrder = async () => {
+    if (lookupPassword.length < 8 || new TextEncoder().encode(lookupPassword).length > 72) {
+      toast.error("请设置至少 8 位查询密码（最多 72 字节）")
+      return
+    }
     if (!email.trim()) {
       toast.error(t("product.emailRequired"))
       emailInputRef.current?.focus()
@@ -74,6 +80,7 @@ export default function CheckoutPage() {
       const result = await withMockFallback(
         () => orderApi.createFromCart({
           email,
+          lookup_password: lookupPassword,
           payment_method: selectedPayment,
           idempotency_key: generateIdempotencyKey(),
           device,
@@ -142,6 +149,8 @@ export default function CheckoutPage() {
             {t("product.emailFullHint")}
           </p>
         </div>
+
+        <OrderLookupPassword value={lookupPassword} onChange={setLookupPassword} />
 
         {/* Payment method */}
         <div className="rounded-lg border border-border bg-background p-6">

@@ -55,7 +55,8 @@ class PaymentRegressionTests {
         });
         Map<String, Object> result = orders.createDirectOrder(Map.of(
                 "product_id", product.getId().toString(), "quantity", 1,
-                "email", UUID.randomUUID() + "@example.com", "payment_method", channelCode),
+                "email", UUID.randomUUID() + "@example.com", "payment_method", channelCode,
+                "access_token", "a".repeat(64), "lookup_password", "test-password-123"),
                 null, null, UUID.randomUUID().toString());
         Map<?, ?> payment = (Map<?, ?>) result.get("payment");
         Order saved = orderRepository.findById((UUID) payment.get("order_id")).orElseThrow();
@@ -64,12 +65,12 @@ class PaymentRegressionTests {
         saved.setUsdtWalletAddress("wallet");
         saved.setUsdtCryptoAmount("1.234");
         saved.setUsdtChain("usdt_trc20");
-        orderRepository.save(saved);
+        saved = orderRepository.save(saved);
         assertEquals("1.234", orders.getOrderStatus(saved.getId()).get("crypto_amount"));
         assertEquals(channelCode, orders.getOrderStatus(saved.getId()).get("payment_method"));
         saved.setStatus(OrderStatus.PAID);
         saved.setPaidAt(java.time.LocalDateTime.of(2098, 1, 1, 12, 0));
-        orderRepository.save(saved);
+        saved = orderRepository.save(saved);
         adminOrders.deleteOrder(saved.getId());
         assertEquals(OrderStatus.PAID, orderRepository.findById(saved.getId()).orElseThrow().getStatus());
         Map<?, ?> revenue = (Map<?, ?>) adminOrders.getRevenueStats("2098-01-01", "2098-01-01");

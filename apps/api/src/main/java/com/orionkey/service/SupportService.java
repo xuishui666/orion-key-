@@ -160,6 +160,15 @@ public class SupportService {
     }
 
     @Transactional
+    public void adminDelete(UUID id) {
+        SupportConversation conversation = find(id);
+        images.deleteByConversation(id);
+        messages.deleteByConversation(id);
+        conversations.delete(conversation);
+        conversations.flush();
+    }
+
+    @Transactional
     public MessageView adminMessage(UUID id, String text) {
         return saveMessage(find(id), SupportMessage.Sender.ADMIN, text, null);
     }

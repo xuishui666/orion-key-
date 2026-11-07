@@ -290,6 +290,7 @@ export interface SiteConfigKV {
 // ============================================================
 
 export interface CreateOrderRequest {
+  lookup_password: string
   product_id: string
   spec_id: string | null
   quantity: number
@@ -300,6 +301,7 @@ export interface CreateOrderRequest {
 }
 
 export interface CreateCartOrderRequest {
+  lookup_password: string
   email: string
   payment_method: string
   idempotency_key: string

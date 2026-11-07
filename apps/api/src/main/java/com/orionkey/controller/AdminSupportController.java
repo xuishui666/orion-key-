@@ -17,6 +17,13 @@ import java.util.UUID;
 public class AdminSupportController {
     private final SupportService supportService;
 
+    @com.orionkey.annotation.LogOperation(action = "support.delete", targetType = "SUPPORT", targetId = "#id", detail = "'删除客服会话及图片'")
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable UUID id) {
+        supportService.adminDelete(id);
+        return ApiResponse.success();
+    }
+
     @GetMapping
     public ApiResponse<?> list() {
         return ApiResponse.success(supportService.adminConversations());
