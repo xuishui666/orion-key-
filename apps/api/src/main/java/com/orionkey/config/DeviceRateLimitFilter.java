@@ -17,6 +17,7 @@ import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -56,6 +57,9 @@ public class DeviceRateLimitFilter implements Filter {
     private final Map<String, SlidingWindowCounter> deviceBuckets = new ConcurrentHashMap<>();
     /** TXID per-order 限流桶（key: orderId） */
     private final Map<String, SlidingWindowCounter> txidOrderBuckets = new ConcurrentHashMap<>();
+    // shortcut: counters are local to one API process; use shared storage before running multiple replicas.
+    private final Map<String, SlidingWindowCounter> orderAttemptBuckets = new ConcurrentHashMap<>();
+    private long nextAttemptCleanup;
 
     // ── 配置缓存 ──
     private volatile boolean cachedEnabled = true;
@@ -83,6 +87,9 @@ public class DeviceRateLimitFilter implements Filter {
             chain.doFilter(request, response);
             return;
         }
+
+        // Separate abuse budget: failed requests count without consuming the hourly purchase allowance.
+        if (category == Category.ORDER && !allowOrderAttempt(httpRequest, response)) return;
 
         // 检查开关
         refreshConfig();
@@ -184,10 +191,49 @@ public class DeviceRateLimitFilter implements Filter {
     private String resolveRateLimitKey(HttpServletRequest request) {
         String deviceId = request.getHeader(DEVICE_ID_HEADER);
         if (StringUtils.hasText(deviceId) && DEVICE_ID_PATTERN.matcher(deviceId).matches()) {
-            return deviceId;
+            return deviceId.toLowerCase(Locale.ROOT);
         }
         // 降级为 IP
         return resolveClientIp(request);
+    }
+
+    private synchronized boolean allowOrderAttempt(HttpServletRequest request, ServletResponse response) throws IOException {
+        long now = System.currentTimeMillis();
+        if (now >= nextAttemptCleanup) {
+            orderAttemptBuckets.entrySet().removeIf(e -> e.getValue().expired(now));
+            nextAttemptCleanup = now + 60_000;
+        }
+        String ip = resolveClientIp(request);
+        if (!consumeAttempt("ip-minute:" + ip, 60_000, 30, response)
+                || !consumeAttempt("ip-ten-minutes:" + ip, 600_000, 100, response)) return false;
+        String device = request.getHeader(DEVICE_ID_HEADER);
+        if (device != null && DEVICE_ID_PATTERN.matcher(device).matches()) {
+            device = device.toLowerCase(Locale.ROOT);
+            return consumeAttempt("device-minute:" + device, 60_000, 6, response)
+                    && consumeAttempt("device-ten-minutes:" + device, 600_000, 20, response);
+        }
+        return true;
+    }
+
+    private boolean consumeAttempt(String key, long window, int limit, ServletResponse response) throws IOException {
+        SlidingWindowCounter counter = orderAttemptBuckets.get(key);
+        if (counter == null) {
+            if (orderAttemptBuckets.size() >= 10_000) {
+                rejectOrderAttempt(response, 60);
+                return false;
+            }
+            counter = new SlidingWindowCounter(window);
+            orderAttemptBuckets.put(key, counter);
+        }
+        if (counter.tryIncrement(limit)) return true;
+        log.info("Order request limit hit: key={}", key);
+        rejectOrderAttempt(response, counter.retryAfterSeconds());
+        return false;
+    }
+
+    private void rejectOrderAttempt(ServletResponse response, long seconds) throws IOException {
+        ((HttpServletResponse) response).setHeader("Retry-After", Long.toString(seconds));
+        reject(response);
     }
 
     private String resolveClientIp(HttpServletRequest request) {
@@ -296,6 +342,14 @@ public class DeviceRateLimitFilter implements Filter {
 
         synchronized void decrement() {
             if (count > 0) count--;
+        }
+
+        synchronized boolean expired(long now) {
+            return now - windowStart >= windowMs;
+        }
+
+        synchronized long retryAfterSeconds() {
+            return Math.max(1, (windowMs - (System.currentTimeMillis() - windowStart) + 999) / 1000);
         }
     }
 }

@@ -18,11 +18,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Supplier;
 
 @Slf4j
 @Service
@@ -45,9 +48,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Map<String, Object> createDirectOrder(Map<String, Object> req, UUID userId, String clientIp, String sessionToken) {
-        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
-        transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        Order order = transaction.execute(status -> persistDirectOrder(req, userId, clientIp, sessionToken));
+        Order order = createAtomically(() -> persistDirectOrder(req, userId, clientIp, sessionToken));
         return buildOrderResult(Objects.requireNonNull(order), (String) req.get("device"));
     }
 
@@ -146,10 +147,20 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Map<String, Object> createCartOrder(Map<String, Object> req, UUID userId, String clientIp, String sessionToken) {
+        Order order = createAtomically(() -> persistCartOrder(req, userId, clientIp, sessionToken));
+        return buildOrderResult(Objects.requireNonNull(order), (String) req.get("device"));
+    }
+
+    private Order createAtomically(Supplier<Order> persist) {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        Order order = transaction.execute(status -> persistCartOrder(req, userId, clientIp, sessionToken));
-        return buildOrderResult(Objects.requireNonNull(order), (String) req.get("device"));
+        // PostgreSQL prevents two concurrent count-then-insert transactions from exceeding the pending limit.
+        transaction.setIsolationLevel(TransactionDefinition.ISOLATION_SERIALIZABLE);
+        try {
+            return transaction.execute(status -> persist.get());
+        } catch (ConcurrencyFailureException e) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "下单请求冲突，请稍后重试", HttpStatus.CONFLICT);
+        }
     }
 
     private Order persistCartOrder(Map<String, Object> req, UUID userId, String clientIp, String sessionToken) {

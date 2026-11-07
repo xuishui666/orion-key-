@@ -31,7 +31,7 @@ jobs:
       - name: PostgreSQL order security and support deletion regression
         working-directory: apps/api
         run: >-
-          mvn -B -Dtest=OrderPrivacyAndDeliveryTests,SupportDeletionTests
+          mvn -B -Dtest=OrderPrivacyAndDeliveryTests,SupportDeletionTests,OrderCreationConcurrencyTests
           -Dspring.datasource.url=jdbc:postgresql://localhost:5432/orion_test
           -Dspring.datasource.driver-class-name=org.postgresql.Driver
           -Dspring.datasource.username=postgres
