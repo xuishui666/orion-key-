@@ -1,6 +1,8 @@
 # zr68 宝塔部署与重建
 
-本指南只针对 `xuishui666/orion-key-` 的 `orion-zr68` 实例，不适用于上游仓库或同服务器的其他项目。最后一次已验证的 API/Web 镜像标签是 `d16092a`；重建时可以固定使用该版本，也可以先在 GitHub Actions 确认新提交的 **Project checks** 和 **Orion Key CI/CD** 均成功，再同时替换两个镜像标签。推送代码只构建镜像，不会自动更新这台宝塔服务器。
+本指南只针对 `xuishui666/orion-key-` 的 `orion-zr68` 实例，不适用于上游仓库或同服务器的其他项目。实际源码分支为 `work/payment-admin-fixes-20260906`，不要从默认 `main` 分支取部署代码。
+
+2026-11-07 已验证构建的版本是 `f396f3f`，包含客服攻击文本拦截与限流；本次尚未部署宝塔。之前已确认的生产 API 为 `c2d9a95`，Web 部署记录为 `0a8ee0d`。前后端可以独立升级；推送代码只构建镜像，不会自动更新这台宝塔服务器。每次部署前重新确认目标提交的 **Project checks** 和 **Orion Key CI/CD** 均成功，并核对服务器实际标签。
 
 ## 1. 先决定是新装还是恢复
 
@@ -38,6 +40,16 @@ bash prepare.sh
 
 模板 `deploy/zr68/compose.yaml` 内置 PostgreSQL 16，使用 `orion-zr68_db_data` 卷；上传文件使用 `orion-zr68_uploads` 卷。两个卷不会因 `up -d` 重建容器而删除。不要运行带 `-v` 的 `down` 或 Docker 全局清理命令。
 
+**启动前先更新模板中的历史标签 `d16092a`**，将 API/Web 分别改成目标固定标签（例如已构建的 `f396f3f`）。模板中的旧标签不代表最新功能。
+
+**全新数据库必须设置管理员初始化密码**：在私密 `.env` 中添加自行设置的强密码 `ADMIN_BOOTSTRAP_PASSWORD`，并在 API 服务的 `environment` 中增加如下映射；模板已有 `PASSWORD_PLAIN: "false"`。只改 `.env` 不会将未映射的变量传入该服务。
+
+```yaml
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
+```
+
+首次成功启动后，从 `.env` 移除初始化密码并重建 API。用户名为 `admin`，密码是自行设置的值，没有默认公共密码；已有用户数据时不会重新创建管理员。恢复已有站点应保留旧账号及原配置，详见 [管理员初始化](../../ADMIN-BOOTSTRAP.md)。
+
 ```bash
 cd /www/wwwroot/orion-zr68
 docker compose -p orion-zr68 -f compose.yaml config --quiet
@@ -53,7 +65,7 @@ docker ps --filter 'label=com.docker.compose.project=orion-zr68' --format '{{.Na
 docker logs --tail 80 orion-zr68-api-1
 ```
 
-首次启动会自动建表。**不要运行旧版 `apps/api/src/main/resources/data.sql` 创建管理员。** 空用户库会自动创建初始管理员；登录后立即修改默认密码，见 [管理员初始化](../../ADMIN-BOOTSTRAP.md)。恢复旧数据库不会重置现有管理员密码。手动迁移旧版数据时，先核对 [软删除迁移](../../apps/api/migrations/20260906_soft_delete.sql) 是否已经应用；不要在生产库上盲目重复执行其他初始化 SQL。
+首次启动会自动建表。**不要运行旧版 `apps/api/src/main/resources/data.sql` 创建管理员。** 空用户库仅在已正确设置上述初始化密码和 BCrypt 配置时创建管理员。登录地址 `/login`，后台 `/admin/dashboard`；普通用户注册和登录关闭。恢复旧数据库不会重置现有管理员密码。手动迁移旧版数据时，先核对 [软删除迁移](../../apps/api/migrations/20260906_soft_delete.sql) 是否已经应用；不要在生产库上盲目重复执行其他初始化 SQL。
 
 ## 4. 域名、HTTPS 与 BEpusdt
 
@@ -202,11 +214,15 @@ docker pull ghcr.io/xuishui666/orion-key-api:<NEW_TAG>
 docker pull ghcr.io/xuishui666/orion-key-web:<NEW_TAG>
 ```
 
-把**当前服务器**的 `compose.yaml` 中两处镜像标签精确改为同一个 `<NEW_TAG>`，不要覆盖整份配置或 `.env`。然后：
+把**当前服务器**的 `compose.yaml` 中需要更新的服务镜像标签精确改为 `<NEW_TAG>`，不要覆盖整份配置或 `.env`。API/Web 都有改动时可改为同一标签并执行：
 
 ```bash
 docker compose -p orion-zr68 -f compose.yaml config --quiet
 docker compose -p orion-zr68 -f compose.yaml up -d --no-deps api web
 ```
+
+只有 API 改动时，仅拉取并修改 API 标签，使用 `up -d --no-deps api`，保留 Web 标签及数据库。只有 Web 改动时同理。更新 `.env` 中的运行参数后也需通过 Compose 重建对应容器；单独 `docker restart` 不会读取新环境变量。
+
+当前版本的自动清理：每天北京时间 03:15 清理超过 30 天的客服消息、关联图片及符合条件的空会话；03:30 清理付款超过 30 天且已发货的订单，以及当天零点之前创建且已超时的未支付订单。待审核关联记录有保留条件，已用 USDT TXID 保留最小防重放标记。订单彻底清理会影响历史查询和销售统计，客服清理不删除 TG 聊天记录。具体规则见仓库根 README。
 
 等 API 完全启动再执行第 6 节验证。若新版本异常，从升级前的 `compose.yaml` 备份恢复旧标签，再用同一条 `up -d --no-deps api web` 重建；**不要回滚或删除数据库卷**。数据库结构变更可能不可逆，涉及迁移时必须先验证旧镜像兼容性，并保留可恢复的数据库备份。升级本身不应改变管理员密码、商品、订单、卡密或支付渠道配置。
