@@ -1,312 +1,160 @@
-<div align="center">
+# Orion Key：游客下单与 Telegram 客服版
 
-# Orion Key
+基于 [RivenLau/orion-key](https://github.com/RivenLau/orion-key) 二次开发的数字商品自动发卡系统。本仓库当前面向游客购买，不提供普通用户注册或登录；保留管理员登录、订单管理、支付、公告和双向 Telegram 客服。
 
-**自动化数字商品（卡密）发卡平台**
+## 从这里开始
 
-Automated Digital Goods Delivery Platform
+**实际开发与构建分支是 [`work/payment-admin-fixes-20260906`](https://github.com/xuishui666/orion-key-/tree/work/payment-admin-fixes-20260906)。仓库默认 `main` 分支尚未同步业务代码，首页 README 已同步当前说明；不要直接使用 `main` 的源码或部署模板重建当前站点。**
 
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-![Java](https://img.shields.io/badge/Java-22-orange?logo=openjdk)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4-brightgreen?logo=springboot)
-![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
-![React](https://img.shields.io/badge/React-19-61dafb?logo=react)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18+-336791?logo=postgresql&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178c6?logo=typescript&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-3.4-38bdf8?logo=tailwindcss&logoColor=white)
-![pnpm](https://img.shields.io/badge/pnpm-9+-f69220?logo=pnpm&logoColor=white)
+| 项目 | 当前说明 |
+| --- | --- |
+| 本 fork | `xuishui666/orion-key-`，仓库名末尾有 `-` |
+| 后端镜像 | `ghcr.io/xuishui666/orion-key-api:<固定标签>` |
+| 前端镜像 | `ghcr.io/xuishui666/orion-key-web:<固定标签>` |
+| 宝塔 Compose 项目名 | `orion-zr68` |
+| 部署目录 | `/www/wwwroot/orion-zr68` |
+| 完整安装、恢复和升级 | [宝塔部署与重建指南](https://github.com/xuishui666/orion-key-/blob/work/payment-admin-fixes-20260906/deploy/zr68/README.md) |
+| 管理员初始化 | [ADMIN-BOOTSTRAP.md](https://github.com/xuishui666/orion-key-/blob/work/payment-admin-fixes-20260906/ADMIN-BOOTSTRAP.md) |
 
-简体中文 | [English](README.en.md)
+### 版本与上线状态
 
-</div>
+以下为 **2026-11-07 文档更新时**已核对的状态，不是自动读取的在线状态：
 
----
+| 状态 | 版本 | 内容 |
+| --- | --- | --- |
+| 上次已确认部署的 API | `c2d9a95` | 管理员专用登录、移除普通用户管理等 |
+| 上次部署记录中的 Web | `0a8ee0d` | 恢复前台登录入口，管理员登录默认进入后台 |
+| 已提交、测试和构建通过的安全修复 | `f396f3f` | 客服攻击文本拦截与更严格的发送限流 |
 
-## 截图预览
+**`f396f3f` 尚未执行本次宝塔更新。** 更新 README 不等于更新线上容器。前后端可以使用不同标签：仅后端修复时只升级 API。重建当前完整功能可选用已构建的 `f396f3f` API/Web 镜像，部署前仍应检查相应 Actions 结果及镜像是否可拉取。
 
-| 前台首页（亮色） | 前台首页（暗色） |
-|:---:|:---:|
-| ![首页-亮色](.github/assets/home-light.png) | ![首页-暗色](.github/assets/home-dark.png) |
+## 已实现功能
 
-| 管理后台（亮色） | 管理后台（暗色） |
-|:---:|:---:|
-| ![后台-亮色](.github/assets/admin-light.png) | ![后台-暗色](.github/assets/admin-dark.png) |
+- 游客直接购买、购物车结算、订单查询和付款后自动发卡。
+- 支付宝/微信通过易支付接入；USDT TRC-20/BEP-20 通过独立 BEpusdt 网关接入。实际可用方式取决于后台已配置并启用的渠道。
+- 分类、商品、库存和卡密管理；订单删除/批量删除；按日期、支付渠道和商品查看销售统计。
+- 管理员专用登录与个人资料/密码修改；普通用户注册、登录、会员订单页、用户管理入口及积分设置已移除或停用。历史数据库结构并不因此全部删除。
+- 首页公告栏：后台编辑公告标题、正文和样式，支持换行；不再使用旧网站标语和描述作为首页内容。
+- 前台“联系客服”入口；客服欢迎语可以在后台网站设置中修改。
+- 客户端与 Telegram 双向文字、图片通信；图片支持 JPG、PNG、WebP，单张不超过 3 MB。
+- Telegram 通知包含会话编号，并关联同一会话的上一条通知。客服在 TG 中使用“回复”指定通知，系统根据消息关联找到客户；单独给机器人发送新消息不会自动指定客户。
+- 管理后台客服会话查看及回复、风控管理、TXID 审核、操作日志。
 
----
+### 客服安全规则（从 `f396f3f` 起）
 
-## 在线 Demo
+客户首条消息、后续文字及会话附带的联系字段会检查常见 JNDI/LDAP/RMI、脚本注入、模板注入、SQL 注入、路径穿越和命令执行载荷。命中后拒绝提交，不写入客服记录、不转发 TG；首条命中时不创建会话。
 
-> 演示环境已开放，可直接登录管理后台体验完整功能。
+服务端日志只记录拦截类别、会话标识和长度，不打印被拦截的正文。正常中文、英文、订单号、邮箱、网址及图片不按语言直接拒绝；管理员回复不受客户文本过滤规则约束。
 
-| | 地址 |
-|---|---|
-| 🛒 **前台** | <a href="https://www.orionkey-demo.com/" target="_blank" rel="noopener noreferrer">https://www.orionkey-demo.com/</a> |
-| 🛠️ **管理后台** | <a href="https://www.orionkey-demo.com/admin" target="_blank" rel="noopener noreferrer">https://www.orionkey-demo.com/admin</a> |
-| 🔑 **管理员账号** | `admin` / `123456` |
+创建会话与后续发送分别使用设备限流桶：每小时最多 10 次创建；后续文字和图片合计每小时最多 10 次发送。没有有效设备标识时使用来源 IP；另保留 IP 级保护。限流为进程内计数，API 重启后重置。这些规则用于减少常见探测和骚扰，不能替代依赖更新、权限控制及安全审计。
 
----
+### 自动清理与历史数据
 
-## 核心特性
+| 数据 | 执行时间（北京时间） | 实际规则 |
+| --- | --- | --- |
+| 客服消息和图片 | 每日 03:15 | 彻底删除超过 30 天的消息及其图片；删除已无消息且超过 30 天未活动的会话 |
+| 已完成订单 | 每日 03:30 | 清理 `DELIVERED` 且付款时间超过 30 天的订单；仅 `PAID` 尚未发货的订单不在此规则内 |
+| 未支付订单 | 每日 03:30 | 清理当天零点之前创建、已经超时的 `PENDING` / `EXPIRED` 订单，包含更早的历史积压 |
 
-|  |  |
-|---|---|
-| 🛒 **自动发卡** — 下单支付后自动发放卡密，零人工干预 | 🎨 **主题切换** — 支持亮色/暗色模式，多主题色自由切换 |
-| 📦 **商品管理** — 分类、上下架、库存、批量导入卡密 | 🔒 **安全认证** — JWT 无状态认证 + BCrypt 加密 |
-| 💳 **多支付渠道** — 可扩展的支付架构，支持微信/支付宝 | 🛡️ **风控系统** — IP 限流、登录防爆破、订单防刷 |
-| 📊 **管理后台** — 仪表盘数据概览、订单/用户/站点全面管理 | 🔍 **订单追踪** — 订单号查询卡密，支持游客和会员 |
-| 🛍️ **购物车** — 多商品合并下单，提升购买体验 | ⚙️ **站点配置** — 公告、弹窗、维护模式，后台一键开关 |
+订单清理会处理关联明细及卡密等关系；待人工审核的相关订单有保留条件。已用 USDT TXID 会保留最小防重放标记，不是清除所有交易标识。彻底删除后不能再查询原订单，历史销售统计也会受到影响；需要长期留存的报表应另行保存。清理站内客服记录不会删除 Telegram 里的历史消息。
 
----
+## 技术与运行环境
 
-## 支付渠道集成
+| 组件 | 当前代码/部署 |
+| --- | --- |
+| 后端 | Java 22 构建、Spring Boot 3.4.1、Maven、Spring Data JPA/Security |
+| 前端 | Next.js 16、React 19、TypeScript、Tailwind CSS、pnpm |
+| 数据库 | 当前宝塔模板为 PostgreSQL 16 Alpine；不要套用上游 PostgreSQL 18+ 的旧说明升级现有数据卷 |
+| 认证 | 管理员 JWT + BCrypt；生产设置 `PASSWORD_PLAIN=false` |
+| 支付网关 | BEpusdt 独立容器与独立数据卷 |
+| 构建发布 | GitHub Actions → GHCR；宝塔按固定标签更新 |
 
-| 渠道            | 接入方式        | 说明             |
-|---------------|-------------|----------------|
-| 支付宝           | 易支付集成       | 通过第三方易支付平台接入   |
-| 微信支付          | 易支付集成       | 通过第三方易支付平台接入   |
-| 支付宝     | 原生接入（待实现）   | 需企商户资质 |
-| 微信支付   | 原生接入（待实现）   | 需商户资质  |
-| USDT (TRC-20) | BEpusdt 自托管 | 链上自动确认，无第三方托管  |
-| USDT (BEP-20) | BEpusdt 自托管 | 链上自动确认，无第三方托管  |
+低配置服务器应使用 `deploy/zr68/compose.yaml` 的资源限制作为起点，并按实际内存和并发监测。该模板配置约束了 API、Web、数据库的内存与线程；容器能启动不等于适合任何并发量。购买商品时不需要单独运行 Chatwoot 等重型客服服务。
 
-> 支付架构可扩展，可通过后台「支付渠道管理」自由配置和切换。
+## 全新搭建步骤
 
-💡 **易支付入驻推荐**：<a href="https://api.niman.cn/user/?invite=X1NUVw" target="_blank" rel="noopener noreferrer">https://api.niman.cn/user/?invite=X1NUVw</a>
-> 通过该链接注册后，联系易支付客服 QQ：**26266156**（备注 **1203**），可享受永久 **3%** 超低提现手续费。
+详细命令见[重建指南](https://github.com/xuishui666/orion-key-/blob/work/payment-admin-fixes-20260906/deploy/zr68/README.md)。下面是当前版本必须满足的顺序。
 
----
+1. 安装 Docker Engine、Docker Compose 插件和 Nginx/宝塔；准备域名与 HTTPS。检查端口、磁盘和内存。
+2. 从实际开发分支获取源码：
 
-## 技术架构
+   ```bash
+   git clone --branch work/payment-admin-fixes-20260906 --single-branch https://github.com/xuishui666/orion-key-.git /root/orion-key-source
+   ```
 
-| 层级 | 技术栈 |
-|------|--------|
-| **前端** | Next.js 16 · React 19 · TypeScript · Tailwind CSS 3 · shadcn/ui |
-| **后端** | Spring Boot 3.4 · Java 22 · Spring Data JPA · Spring Security |
-| **数据库** | PostgreSQL 18+ |
-| **认证** | JWT (jjwt) · BCrypt |
-| **构建** | pnpm (前端) · Maven (后端) |
+3. 在全新部署目录复制 `deploy/zr68/compose.yaml` 和 `prepare.sh`。仅全新安装运行 `prepare.sh` 生成数据库密码和 JWT 密钥。已有站点或恢复数据时使用原 `.env` 和数据卷。
+4. 模板仍有历史固定标签，启动前将 API/Web 标签分别改为已经验证的目标版本，例如 `f396f3f`。不要拉取 `rivenlau` 的上游镜像替代本 fork。
+5. 新库需要在私密 `.env` 设置 `ADMIN_BOOTSTRAP_PASSWORD`；同时在 API 的 `environment` 显式增加：
 
-### Monorepo 目录结构
+   ```yaml
+   ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
+   ```
 
-> 基于 pnpm workspaces 的 Monorepo 架构，前后端统一管理。
+   模板已设置 `PASSWORD_PLAIN: "false"`。只把变量写入 `.env` 不会自动把它传给这种显式环境变量形式的 API 服务。首次启动创建用户名 `admin`，密码是自行设置的值，没有通用默认密码。已有任何用户记录时不会重建或提升账户权限。
+6. 先启动数据库并等待 `healthy`，再启动 API/Web。首次启动后移除 `.env` 中的初始化密码并重建 API；保留管理员登录密码在自己的密码管理器中。不要通过旧 `data.sql` 创建管理员。
+7. 配置 HTTPS 反向代理：商城 → `127.0.0.1:13000`；API 由 Web 转发，API 本机端口为 `18083`。BEpusdt 独立部署，示例端口 `18881`。这些服务端口不直接向公网开放。
+8. 打开 `/login` 登录管理员，后台位于 `/admin/dashboard`。配置商品、卡密、公告、支付渠道及客服，完成验证后再开放购买。
 
-```
-orion-key/
-├── apps/
-│   ├── web/                          # Next.js 前端
-│   │   ├── app/
-│   │   │   ├── (store)/              # 前台路由组（首页、商品、购物车、订单、支付…）
-│   │   │   └── admin/                # 管理后台路由组（仪表盘、商品/卡密/订单/用户管理…）
-│   │   ├── features/                 # 业务功能模块
-│   │   ├── services/                 # API 调用层（统一封装后端接口）
-│   │   ├── hooks/                    # 自定义 React Hooks
-│   │   ├── components/               # 通用 UI 组件（shadcn/ui）
-│   │   ├── types/                    # TypeScript 类型定义
-│   │   └── next.config.mjs           # Next.js 配置（含 API 代理 rewrites）
-│   │
-│   └── api/                          # Spring Boot 后端
-│       └── src/main/
-│           ├── java/com/orionkey/
-│           │   ├── controller/       # REST 控制器（前台 + Admin）
-│           │   ├── entity/           # JPA 实体（16 张表）
-│           │   ├── repository/       # 数据访问层
-│           │   ├── service/          # 业务逻辑层
-│           │   ├── config/           # 安全、JWT、跨域等配置
-│           │   └── model/            # DTO / VO
-│           └── resources/
-│               ├── application.yml   # 应用配置（数据库、JWT、邮件、上传等）
-│               └── data.sql          # 初始化数据（管理员、站点配置、支付渠道）
-│
-├── docker-compose.yml                # Docker Compose 编排（生产 / 本地通用）
-├── .env.example                      # 环境变量模板
-└── pnpm-workspace.yaml               # Monorepo 工作区声明
+根目录 `docker-compose.yml` 是通用编排，需自行提供数据库并设置镜像等参数；它不是已有 `orion-zr68/compose.yaml` 的替代文件。
+
+## Telegram 客服配置
+
+通过 BotFather 创建机器人，先给机器人私聊发送 `/start`。需要的是**管理员本人私聊的 Chat ID**，不是机器人 ID。Token 只保存在服务器私密配置中。
+
+```dotenv
+SUPPORT_TELEGRAM_BOT_TOKEN=<BotFather 提供的 Token>
+SUPPORT_TELEGRAM_CHAT_ID=<管理员私聊 Chat ID>
+SUPPORT_TELEGRAM_WEBHOOK_SECRET=<自行生成的随机字符串>
+SUPPORT_TELEGRAM_WEBHOOK_URL=https://你的商城域名/api/support/telegram/webhook
 ```
 
----
+API Compose 环境中必须传递上述四个变量；当前宝塔模板已包含这些映射。修改 `.env` 后通过 `up -d --no-deps api` 重建容器使环境生效，仅 `docker restart` 不会重新读取 `.env`。应用会注册 Webhook；HTTPS 地址必须能被 Telegram 访问。
 
-## 先决条件
+启用后检查 `/api/support/config` 返回 `data.enabled=true`。它仅表示配置齐全，还应检查 Telegram `getWebhookInfo`，并实测网页发消息、TG 收到通知、回复指定通知后网页收到文字/图片。不要把 Token 或完整 `.env` 输出到公开日志。Webhook 已启用时不要再通过 `getUpdates` 排查私聊消息。
 
-开始之前，请确保已安装以下工具：
+## 支付配置
 
-| 工具 | 版本 | 说明 |
-|------|------|------|
-| Java | 22+ | 后端运行环境 |
-| Maven | 3.9+ | 后端构建工具 |
-| Node.js | 20+ | 前端运行环境 |
-| pnpm | 9+ | 前端包管理（`npm i -g pnpm`） |
-| PostgreSQL | 18+ | 数据库，需提前创建库和用户 |
+- 易支付渠道：在后台填写对应服务商地址、商户与签名配置；分别验证创建支付和签名回调。
+- USDT：独立部署 BEpusdt，配置自己的 TRC-20/BEP-20 公开收款地址，保存原 SQLite 数据卷及 API 凭据。
+- Orion 的 USDT 渠道 Token 必须与 BEpusdt 一致，回调地址为 `https://你的商城域名/api/payments/webhook/usdt`。
+- RPC 节点要实测扫链所需请求；BSC 需支持最新区块和历史 `eth_getLogs`。限额、429/403、超时会影响识别和流量，换一个 RPC 地址并不保证降低流量。
+- 两条链分别实测到账、回调、订单状态和发货；网页“成功”与钱包到账应独立核对。无需向系统提供钱包私钥或助记词。
 
----
+## 更新、恢复与排查
 
-## 配置
+更新顺序：提交实际开发分支 → 等待 **Project checks** 与 **Orion Key CI/CD** 成功 → 拉取目标固定标签 → 修改本项目现有 Compose 对应服务的标签 → 只重建有变化的服务 → 验证。API 启动可能需要约一分钟，启动期间的 502/500 不应立即当作最终结果；持续失败要检查 API 日志。
 
-核心配置文件：`apps/api/src/main/resources/application.yml`
+构建镜像不会自动部署到宝塔。文档提交也可能触发现有构建工作流，不表示业务代码变化或线上已切换。仅更新 API 时不必一起重建 Web 或数据库。
 
-所有配置项均支持**环境变量覆盖**（格式 `${ENV_VAR:默认值}`），本地开发可直接修改 yml，生产环境建议通过环境变量注入。
-
-### 数据库
-
-```yaml
-spring:
-  datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/orion_key}
-    username: ${DB_USERNAME:orionkey}
-    password: ${DB_PASSWORD:your_password}
-```
-
-首次启动自动建表（`ddl-auto: update`），启动后执行一次初始化 SQL(data.sql文件) 写入管理员账户、站点配置：
-
-
-> SQL 内置 `WHERE NOT EXISTS`，多次执行不会产生重复数据。
-
-### JWT 认证
-
-```yaml
-jwt:
-  secret: ${JWT_SECRET:<用 openssl rand -base64 48 生成>}
-  expiration: 86400000  # 24 小时
-```
-
-生产环境**必须**通过 `JWT_SECRET` 环境变量注入随机密钥（至少 256 bits）：
+日常核验命令（只读）：
 
 ```bash
-openssl rand -base64 48
+docker compose -p orion-zr68 -f /www/wwwroot/orion-zr68/compose.yaml config --images
+docker ps --filter 'label=com.docker.compose.project=orion-zr68' --format '{{.Names}} | {{.Image}} | {{.Status}}'
+curl -fsS --max-time 15 https://你的商城域名/api/site/config
+curl -fsS --max-time 15 https://你的商城域名/api/support/config
 ```
 
-### 密码加密模式
+恢复需要原 PostgreSQL 数据库备份、商品上传卷、私密 `.env` / Compose 和独立 BEpusdt 数据/凭据。缺少这些数据时，重新拉镜像不会恢复原商品、卡密、订单或钱包配置。已被定时任务彻底清理的数据只能从仍保留这些记录的备份恢复。
 
-```yaml
-security:
-  password-plain: ${PASSWORD_PLAIN:true}  # true=明文密码(开发用), false=BCrypt(生产用)
-```
+升级后只按精确标签清理本项目已停用、且没有容器引用的旧 API/Web 镜像。不要执行 Docker 全局清理或删除数据库/上传卷。删除旧镜像后，如需回滚必须重新拉取对应固定标签；数据库迁移兼容性需要单独核对。
 
-- **本地开发**：`true`（默认），密码明文存储，方便调试
-- **生产环境**：设为 `false`，启用 BCrypt 加密，**必须在切换前重置所有用户密码**
+## 开发与检查
 
-### 邮件发送
-
-```yaml
-spring:
-  mail:
-    host: ${MAIL_HOST:smtp.example.com}
-    port: ${MAIL_PORT:465}
-    username: ${MAIL_USERNAME:your@email.com}
-    password: ${MAIL_PASSWORD:your_password}
-
-mail:
-  enabled: ${MAIL_ENABLED:true}       # 邮件功能总开关，设为 false 可关闭所有邮件发送
-  site-url: ${MAIL_SITE_URL:https://your-domain.com}
-```
-
-### 文件上传
-
-```yaml
-upload:
-  path: ${UPLOAD_PATH:./uploads}                # 文件存储路径
-  url-prefix: ${UPLOAD_URL_PREFIX:/api/uploads}  # 访问 URL 前缀
-```
-
----
-
-## 部署
-
-> 完整生产部署（含服务器初始化、Nginx/HTTPS、CI/CD、BEpusdt USDT 支付等），本节仅给出最小启动路径。
-
-### 方式一：Docker 部署（推荐）
-
-仓库根目录提供 `docker-compose.yml`，编排 **api / web / bepusdt** 三个容器；**不含 PostgreSQL 和 Nginx**，需自行准备。
-
-镜像已发布至 GHCR 公开仓库，默认 `:latest` tag 跟随最新 release，无需登录即可匿名拉取：
-
-- `ghcr.io/rivenlau/orion-key-api:latest`
-- `ghcr.io/rivenlau/orion-key-web:latest`
+源码使用上面的实际开发分支。开发机准备 Java 22、Maven 3.9+、Node.js 22、pnpm 9+ 和 PostgreSQL。数据库、JWT、邮件、上传目录等配置见 `application.yml` 及 `.env.example`；生产密码与密钥应独立设置。
 
 ```bash
-# 1. 准备 .env（变量含义见上方「配置」章节）
-cp .env.example .env
+# 仓库根目录：安装前端依赖并检查构建
+pnpm install --frozen-lockfile
+pnpm build:web
 
-# 2. 拉取镜像并启动
-docker compose pull
-docker compose up -d
-
-# 3. 查看日志
-docker compose logs -f
-```
-
-> 💡 **生产环境建议固定具体版本号**（如 `:v1.0.0`），在 `.env` 中通过 `API_IMAGE` / `WEB_IMAGE` 覆盖默认值，便于回滚和多机一致性。
-
-> 上传文件通过卷挂载 `./uploads` 持久化，容器重建不丢失。生产环境建议前置 Nginx 反向代理处理 HTTPS 和静态资源。
-
-### 方式二：非 Docker 部署（直接运行）
-
-适合本地开发或单机直跑场景。需先安装 Java 22 / Maven 3.9+ / Node.js 20+ / pnpm 9+ / PostgreSQL 18+。
-
-> ⚠️ **时区提醒**：Docker 部署时已通过 compose 文件注入 `TZ=Asia/Shanghai`；非 Docker 部署需自行确保进程时区正确，否则订单时间、过期判断、链上验证等会偏差 8 小时。任选其一：
->
-> ```bash
-> # 方式 A：改系统时区（一劳永逸，影响所有进程）
-> sudo timedatectl set-timezone Asia/Shanghai
->
-> # 方式 B：启动前注入 TZ 环境变量（仅影响当前进程）
-> export TZ=Asia/Shanghai
-> ```
-
-```bash
-# 后端（端口 8083）
+# 后端完整测试
 cd apps/api
-mvn spring-boot:run
-
-# 前端（端口 3000，新开终端）
-cd apps/web
-pnpm install
-pnpm dev
+mvn -B test
 ```
 
-或在仓库根目录一键启动前端：
-
-```bash
-pnpm install
-pnpm dev:web
-```
-
-> **API 代理**：`next.config.mjs` 已配置 `rewrites`，前端 `/api/*` 自动代理到 `http://localhost:8083`，无需手动处理跨域。
-
-### 验证
-
-- 健康检查：`GET http://localhost:8083/api/health`
-
----
-
-## AI 商店推荐（非 Demo 演示）
-
-[![Orion Key Shop](https://img.shields.io/badge/Orion%20Key%20Shop-在线商店-FF6B00?style=for-the-badge)](https://www.orionkey.shop/)
-
----
-
-## TG 交流群组
-
-[![Telegram](https://img.shields.io/badge/Telegram-群组-26A5E4?logo=telegram&logoColor=white)](https://t.me/+7Gx0vtwWixI3ODZh)
-
----
-
-## 商务合作
-
-**自动发卡网代建、商务合作联系  QQ: 843676885**
-
----
-
-## Star History
-
-<a href="https://star-history.com/#RivenLau/orion-key&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=RivenLau/orion-key&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=RivenLau/orion-key&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=RivenLau/orion-key&type=Date" />
-  </picture>
-</a>
-
----
+本地运行后端用 `mvn spring-boot:run`，另开终端在仓库根目录运行 `pnpm dev:web`。后端端口为 `8083`，API 前缀 `/api`；前端通过代理访问后端。使用空数据库开发也必须按管理员初始化步骤设置密码。
 
 ## License
 
-[MIT](LICENSE) © 2026 Riven
+[MIT](https://github.com/xuishui666/orion-key-/blob/work/payment-admin-fixes-20260906/LICENSE)。原项目版权及许可声明见 LICENSE。
