@@ -1,6 +1,9 @@
 package com.orionkey;
 
 import com.orionkey.entity.SupportMessage;
+import com.orionkey.entity.User;
+import com.orionkey.constant.UserRole;
+import com.orionkey.utils.JwtUtils;
 import com.orionkey.exception.BusinessException;
 import com.orionkey.repository.*;
 import com.orionkey.service.SupportService;
@@ -10,7 +13,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -25,6 +27,9 @@ class SupportDeletionTests {
     @Autowired SupportMessageRepository messages;
     @Autowired SupportImageRepository images;
     @Autowired MockMvc mvc;
+    @Autowired UserRepository users;
+    @Autowired JwtUtils jwt;
+    @Autowired OperationLogRepository logs;
 
     @Test
     void guestCannotDeleteConversation() throws Exception {
@@ -35,8 +40,14 @@ class SupportDeletionTests {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void deletionRemovesOnlySelectedConversationIncludingImagesAndCannotResurrect() throws Exception {
+        User admin = new User();
+        admin.setUsername(java.util.UUID.randomUUID().toString());
+        admin.setEmail(admin.getUsername() + "@example.com");
+        admin.setPasswordHash("unused-test-password");
+        admin.setRole(UserRole.ADMIN);
+        admin = users.saveAndFlush(admin);
+        String token = jwt.generateToken(admin.getId(), admin.getUsername(), "ADMIN");
         var first = support.create(null, null, "first customer");
         var second = support.create(null, null, "second customer");
         byte[] png = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
@@ -44,9 +55,12 @@ class SupportDeletionTests {
         SupportMessage pending = messages.findById(photo.id()).orElseThrow();
         var staleConversation = conversations.findById(first.id()).orElseThrow();
 
-        mvc.perform(delete("/api/admin/support/" + first.id()).contextPath("/api"))
+        mvc.perform(delete("/api/admin/support/" + first.id()).contextPath("/api")
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
 
+        assertTrue(logs.findAll().stream().anyMatch(log -> "support.delete".equals(log.getAction())
+                && first.id().toString().equals(log.getTargetId()) && log.getUserId() != null));
         assertFalse(conversations.existsById(first.id()));
         assertFalse(images.existsById(photo.id()));
         assertTrue(messages.findTop200ByConversationIdOrderByCreatedAtDesc(first.id()).isEmpty());
