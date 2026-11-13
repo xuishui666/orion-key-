@@ -30,7 +30,7 @@ class SupportCleanupServiceTest {
 
     @Test
     void removesOldImagesAndMessagesButKeepsRecentConversation() {
-        LocalDateTime old = LocalDateTime.now().minusDays(31);
+        LocalDateTime old = LocalDateTime.now().minusDays(8);
         SupportConversation inactive = conversation(old);
         SupportMessage oldMessage = message(inactive);
         SupportImage image = new SupportImage();
@@ -43,6 +43,8 @@ class SupportCleanupServiceTest {
 
         jdbc.update("update support_messages set created_at = ? where id = ?",
                 Timestamp.valueOf(old), oldMessage.getId());
+        jdbc.update("update support_messages set created_at = ? where id = ?",
+                Timestamp.valueOf(old), newMessage.getId());
         entityManager.clear();
 
         cleanup.purgeExpired();

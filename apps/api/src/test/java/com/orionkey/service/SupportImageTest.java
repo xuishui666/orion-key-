@@ -34,9 +34,11 @@ class SupportImageTest {
         String token = "A".repeat(43);
         SupportConversation conversation = new SupportConversation();
         conversation.setId(conversationId);
+        conversation.setLastActivityAt(LocalDateTime.now());
         conversation.setTokenHash(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                 .digest(token.getBytes(StandardCharsets.UTF_8))));
         when(conversations.findById(conversationId)).thenReturn(Optional.of(conversation));
+        when(conversations.lockById(conversationId)).thenReturn(Optional.of(conversation));
         when(messages.saveAndFlush(any())).thenAnswer(invocation -> {
             SupportMessage message = invocation.getArgument(0);
             message.setId(messageId);
@@ -74,11 +76,12 @@ class SupportImageTest {
         UUID messageId = UUID.randomUUID();
         SupportConversation conversation = new SupportConversation();
         conversation.setId(conversationId);
+        conversation.setLastActivityAt(LocalDateTime.now());
         SupportMessage original = new SupportMessage();
         original.setConversationId(conversationId);
         original.setSender(SupportMessage.Sender.CUSTOMER);
         when(messages.findByTelegramMessageId(42L)).thenReturn(Optional.of(original));
-        when(conversations.findById(conversationId)).thenReturn(Optional.of(conversation));
+        when(conversations.lockById(conversationId)).thenReturn(Optional.of(conversation));
         when(messages.saveAndFlush(any())).thenAnswer(invocation -> {
             SupportMessage message = invocation.getArgument(0);
             message.setId(messageId);

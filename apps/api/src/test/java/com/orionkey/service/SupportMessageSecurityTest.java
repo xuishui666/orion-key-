@@ -74,7 +74,8 @@ class SupportMessageSecurityTest {
         String token = "A".repeat(43);
         conversation.setTokenHash(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                 .digest(token.getBytes(StandardCharsets.UTF_8))));
-        when(conversations.findById(conversation.getId())).thenReturn(Optional.of(conversation));
+        conversation.setLastActivityAt(java.time.LocalDateTime.now());
+        when(conversations.lockById(conversation.getId())).thenReturn(Optional.of(conversation));
 
         assertThrows(BusinessException.class, () -> service.customerMessage(conversation.getId(), token,
                 "${jndi:ldap://127.0.0.1:9/x}"));

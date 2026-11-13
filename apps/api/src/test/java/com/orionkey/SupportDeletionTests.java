@@ -50,9 +50,17 @@ class SupportDeletionTests {
         String token = jwt.generateToken(admin.getId(), admin.getUsername(), "ADMIN");
         var first = support.create(null, null, "first customer");
         var second = support.create(null, null, "second customer");
+        assertThrows(BusinessException.class, () -> support.customerConversation(first.id(), second.token()));
+        assertThrows(BusinessException.class, () -> support.customerMessage(second.id(), first.token(), "wrong conversation"));
         byte[] png = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
         var photo = support.customerImage(first.id(), first.token(), new MockMultipartFile("file", "photo.png", "image/png", png));
         SupportMessage pending = messages.findById(photo.id()).orElseThrow();
+        pending.setTelegramMessageId(421337L);
+        messages.saveAndFlush(pending);
+        assertTrue(support.telegramReply(421337L, 421338L, "first conversation only"));
+        assertTrue(support.customerConversation(first.id(), first.token()).messages().stream()
+                .anyMatch(message -> "first conversation only".equals(message.text())));
+        assertEquals(1, support.customerConversation(second.id(), second.token()).messages().size());
         var staleConversation = conversations.findById(first.id()).orElseThrow();
 
         mvc.perform(delete("/api/admin/support/" + first.id()).contextPath("/api")

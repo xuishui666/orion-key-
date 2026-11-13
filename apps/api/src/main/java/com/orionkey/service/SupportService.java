@@ -87,14 +87,14 @@ public class SupportService {
 
     @Transactional
     public MessageView customerMessage(UUID id, String token, String text) {
-        SupportConversation conversation = find(id);
+        SupportConversation conversation = findForWrite(id);
         authorize(conversation, token);
         return saveMessage(conversation, SupportMessage.Sender.CUSTOMER, text, null);
     }
 
     @Transactional
     public MessageView customerImage(UUID id, String token, MultipartFile file) {
-        SupportConversation conversation = find(id);
+        SupportConversation conversation = findForWrite(id);
         authorize(conversation, token);
         if (file == null || file.isEmpty() || file.getSize() > MAX_IMAGE_BYTES) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "图片大小须在 3 MB 以内");
@@ -149,7 +149,7 @@ public class SupportService {
 
     @Transactional(readOnly = true)
     public List<ConversationView> adminConversations() {
-        return conversations.findTop100ByOrderByLastActivityAtDesc().stream()
+        return conversations.findTop100ByLastActivityAtAfterOrderByLastActivityAtDesc(SupportCleanupService.cutoff()).stream()
                 .map(c -> new ConversationView(c.getId(), c.getEmail(), c.getOrderReference(),
                         c.getLastActivityAt(), List.of())).toList();
     }
@@ -161,7 +161,7 @@ public class SupportService {
 
     @Transactional
     public void adminDelete(UUID id) {
-        SupportConversation conversation = find(id);
+        SupportConversation conversation = findForWrite(id);
         images.deleteByConversation(id);
         messages.deleteByConversation(id);
         conversations.delete(conversation);
@@ -170,7 +170,7 @@ public class SupportService {
 
     @Transactional
     public MessageView adminMessage(UUID id, String text) {
-        return saveMessage(find(id), SupportMessage.Sender.ADMIN, text, null);
+        return saveMessage(findForWrite(id), SupportMessage.Sender.ADMIN, text, null);
     }
 
     @Transactional
@@ -179,7 +179,9 @@ public class SupportService {
         SupportMessage original = messages.findByTelegramMessageId(repliedMessageId)
                 .orElse(null);
         if (original == null || original.getSender() != SupportMessage.Sender.CUSTOMER) return false;
-        saveMessage(find(original.getConversationId()), SupportMessage.Sender.ADMIN, text, updateId);
+        var conversation = conversations.lockById(original.getConversationId()).filter(this::isActive).orElse(null);
+        if (conversation == null) return false;
+        saveMessage(conversation, SupportMessage.Sender.ADMIN, text, updateId);
         return true;
     }
 
@@ -196,7 +198,9 @@ public class SupportService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "仅支持 JPG、PNG、WebP 图片");
         }
         String text = caption == null || caption.isBlank() ? "[图片]" : caption.trim();
-        saveImage(find(original.getConversationId()), SupportMessage.Sender.ADMIN, text, updateId, contentType, data);
+        var conversation = conversations.lockById(original.getConversationId()).filter(this::isActive).orElse(null);
+        if (conversation == null) return false;
+        saveImage(conversation, SupportMessage.Sender.ADMIN, text, updateId, contentType, data);
         return true;
     }
 
@@ -255,8 +259,17 @@ public class SupportService {
     private record UnsafeContentRule(String category, Pattern pattern) {}
 
     private SupportConversation find(UUID id) {
-        return conversations.findById(id)
+        return conversations.findById(id).filter(this::isActive)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "会话不存在", HttpStatus.NOT_FOUND));
+    }
+
+    private SupportConversation findForWrite(UUID id) {
+        return conversations.lockById(id).filter(this::isActive)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "会话不存在", HttpStatus.NOT_FOUND));
+    }
+
+    private boolean isActive(SupportConversation conversation) {
+        return conversation.getLastActivityAt().isAfter(SupportCleanupService.cutoff());
     }
 
     private void authorize(SupportConversation conversation, String token) {

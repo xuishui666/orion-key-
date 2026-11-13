@@ -19,16 +19,25 @@ public class SupportCleanupService {
     private final SupportMessageRepository messages;
     private final SupportConversationRepository conversations;
 
-    @Scheduled(cron = "0 15 3 * * *", zone = "Asia/Shanghai")
+    static LocalDateTime cutoff() {
+        return LocalDateTime.now().minusDays(7);
+    }
+
+    @Scheduled(cron = "0 15 * * * *", zone = "Asia/Shanghai")
     @Transactional
     public void purgeExpired() {
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(30);
-        int imageCount = images.deleteOlderThan(cutoff);
-        int messageCount = messages.deleteOlderThan(cutoff);
-        int conversationCount = conversations.deleteEmptyOlderThan(cutoff);
-        if (imageCount + messageCount + conversationCount > 0) {
+        var expired = conversations.findByLastActivityAtLessThanEqualOrderById(cutoff());
+        int imageCount = 0;
+        int messageCount = 0;
+        for (var conversation : expired) {
+            imageCount += images.deleteByConversation(conversation.getId());
+            messageCount += messages.deleteByConversation(conversation.getId());
+            conversations.delete(conversation);
+        }
+        if (!expired.isEmpty()) {
+            conversations.flush();
             log.info("Purged expired support data: images={}, messages={}, conversations={}",
-                    imageCount, messageCount, conversationCount);
+                    imageCount, messageCount, expired.size());
         }
     }
 }

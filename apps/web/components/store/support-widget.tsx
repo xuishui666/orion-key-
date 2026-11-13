@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { ImagePlus, MessageCircle, Send, X } from "lucide-react"
-import { getApiErrorMessage, supportApi, type SupportConversation } from "@/services/api"
+import { ApiError, getApiErrorMessage, supportApi, type SupportConversation } from "@/services/api"
 import { SupportImage } from "@/components/store/support-image"
 import { safeStorageGet, safeStorageRemove, safeStorageSet } from "@/lib/utils"
 import { useLocale, useSiteConfig } from "@/lib/context"
@@ -10,6 +10,30 @@ import { useLocale, useSiteConfig } from "@/lib/context"
 const STORAGE_KEY = "support_conversation"
 const DEFAULT_WELCOME_MESSAGE = "您好，请描述遇到的问题，客服收到后会尽快回复。"
 type Session = { id: string; token: string }
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024
+
+async function prepareImage(file: File): Promise<File | null> {
+  if (file.size <= MAX_IMAGE_BYTES) return file
+  const bitmap = await createImageBitmap(file)
+  try {
+    const canvas = document.createElement("canvas")
+    const context = canvas.getContext("2d")
+    if (!context) return null
+    for (const maxSide of [2560, 1920, 1440]) {
+      const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+      context.fillStyle = "#fff"
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", 0.88))
+      if (blob && blob.size <= MAX_IMAGE_BYTES) return new File([blob], "screenshot.jpg", { type: blob.type })
+    }
+    return null
+  } finally {
+    bitmap.close()
+  }
+}
 
 export function SupportWidget() {
   const { locale, t } = useLocale()
@@ -26,6 +50,8 @@ export function SupportWidget() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [error, setError] = useState("")
+  const [readError, setReadError] = useState("")
+  const [sessionInvalid, setSessionInvalid] = useState(false)
   const [sending, setSending] = useState(false)
   const [unread, setUnread] = useState(0)
   const lastAdminId = useRef<string | null>(null)
@@ -60,9 +86,14 @@ export function SupportWidget() {
         setUnread(n => n + 1)
       }
       lastAdminId.current = newestAdmin
-      setError("")
+      setReadError("")
+      setSessionInvalid(false)
     } catch (err) {
-      setError(getApiErrorMessage(err, t))
+      setReadError(getApiErrorMessage(err, t))
+      if (err instanceof ApiError && (err.code === 10003 || err.code === 10004)) {
+        setConversation(null)
+        setSessionInvalid(true)
+      }
     }
   }, [session, open, t])
 
@@ -86,11 +117,24 @@ export function SupportWidget() {
     setSending(true)
     setError("")
     try {
+      let upload: File | undefined
+      if (imageFile) {
+        const prepared = await prepareImage(imageFile).catch(() => undefined)
+        if (!prepared) {
+          setError(prepared === null
+            ? (zh ? "图片压缩后仍超过 3 MB，请裁剪后再试。" : "The compressed image exceeds 3 MB. Try cropping it.")
+            : (zh ? "无法读取图片，请转成 JPG 或 PNG 后再试。" : "Unable to read this image. Convert it to JPG or PNG."))
+          return
+        }
+        upload = prepared
+      }
       let current = session
-      if (!current) {
+      if (!current || sessionInvalid) {
         current = await supportApi.create({ email: email.trim(), order_reference: orderReference.trim(), text: text.trim() })
         safeStorageSet("localStorage", STORAGE_KEY, JSON.stringify(current))
         setSession(current)
+        setSessionInvalid(false)
+        setReadError("")
         setText("")
       } else {
         if (text.trim()) {
@@ -98,14 +142,16 @@ export function SupportWidget() {
           setText("")
         }
       }
-      if (imageFile) {
-        await supportApi.sendImage(current.id, current.token, imageFile)
+      if (upload) {
+        await supportApi.sendImage(current.id, current.token, upload)
         setImageFile(null)
         if (fileInput.current) fileInput.current.value = ""
       }
       setConversation(await supportApi.get(current.id, current.token))
     } catch (err) {
-      setError(getApiErrorMessage(err, t))
+      setError(err instanceof ApiError && (err.code === 429 || err.code === 10005)
+        ? (zh ? "发送过于频繁，内容已保留，请稍后重试。" : "Too many messages. Your draft is saved here. Try again later.")
+        : getApiErrorMessage(err, t))
     } finally {
       setSending(false)
     }
@@ -158,8 +204,8 @@ export function SupportWidget() {
               <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" aria-label={zh ? "选择图片" : "Choose image"} onChange={e => {
                 const file = e.target.files?.[0]
                 if (!file) return
-                if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 3 * 1024 * 1024) {
-                  setError(zh ? "仅支持 3 MB 以内的 JPG、PNG、WebP 图片" : "Choose a JPG, PNG or WebP image under 3 MB")
+                if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+                  setError(zh ? "请选择 JPG、PNG 或 WebP 图片。HEIC 请先转换。" : "Choose JPG, PNG or WebP. Convert HEIC first.")
                   e.target.value = ""
                   return
                 }
@@ -172,7 +218,8 @@ export function SupportWidget() {
             </div>
             {imageFile && imagePreview && <div className="flex items-center gap-2 text-xs"><img src={imagePreview} alt={zh ? "待发送图片" : "Selected image"} className="h-12 w-12 rounded border border-border object-cover" /><span className="min-w-0 flex-1 truncate">{imageFile.name}</span><button type="button" onClick={() => { setImageFile(null); if (fileInput.current) fileInput.current.value = "" }} title={zh ? "移除图片" : "Remove image"} aria-label={zh ? "移除图片" : "Remove image"}><X className="h-4 w-4" /></button></div>}
             {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
-            {session && error && <button type="button" className="text-xs text-primary underline" onClick={() => { safeStorageRemove("localStorage", STORAGE_KEY); setSession(null); setConversation(null); setError("") }}>{zh ? "发起新会话" : "Start a new chat"}</button>}
+            {readError && <p className="text-xs text-destructive">{readError}</p>}
+            {session && sessionInvalid && <button type="button" className="text-xs text-primary underline" onClick={() => { safeStorageRemove("localStorage", STORAGE_KEY); setSession(null); setConversation(null); setError(""); setReadError(""); setSessionInvalid(false) }}>{zh ? "发起新会话" : "Start a new chat"}</button>}
           </form>
         </section>
       )}

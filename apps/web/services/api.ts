@@ -593,6 +593,7 @@ export const supportApi = {
       headers: { "X-Support-Token": token, ...(deviceId ? { "X-Device-Id": deviceId } : {}) },
       body: form,
     })
+    if (res.status === 429) throw new ApiError(429, res.statusText)
     const body: ApiResponse<SupportMessage> = await res.json()
     if (!res.ok || body.code !== 0) throw new ApiError(body.code || res.status, body.message || res.statusText)
     return body.data
@@ -763,3 +764,4 @@ export function getApiErrorMessage(err: unknown, t: (key: any) => string): strin
   }
   return err instanceof Error ? (err.message?.trim() || fallback) : fallback
 }
+
