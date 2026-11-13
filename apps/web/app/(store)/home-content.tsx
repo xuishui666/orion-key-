@@ -1,13 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import {
-  Search,
-  Zap,
-  SquareCheckBig,
-  ClipboardList,
-  ShieldCheck,
-} from "lucide-react"
+import { Search } from "lucide-react"
 import { useLocale, useSearch, useSiteConfig } from "@/lib/context"
 import { ProductCard } from "@/components/store/product-card"
 import { HomeAnnouncement } from "@/components/store/home-announcement"
@@ -31,13 +25,6 @@ export function HomeContent({ products, categories,
   const { searchQuery, sortBy, inStockOnly, priceMin, priceMax } = useSearch()
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-
-  const trustBadges = [
-    { icon: SquareCheckBig, label: t("home.trustAuto"), color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-100 dark:bg-emerald-900/40" },
-    { icon: Zap, label: t("home.trustInstant"), color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-100 dark:bg-amber-900/40" },
-    { icon: ClipboardList, label: t("home.trustTrack"), color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-100 dark:bg-blue-900/40" },
-    { icon: ShieldCheck, label: t("home.trustSecure"), color: "text-teal-600 dark:text-teal-400", bg: "bg-teal-100 dark:bg-teal-900/40" },
-  ]
 
   const filteredProducts = useMemo(() => {
     let result = [...products]
@@ -93,30 +80,6 @@ export function HomeContent({ products, categories,
 
       {/* Controls */}
       <div className="flex flex-col gap-5">
-        {/* Trust badges */}
-        <div className="flex justify-center py-3 sm:block">
-          <div className="grid grid-cols-2 gap-x-10 gap-y-2 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-7">
-          {trustBadges.map((badge, i) => (
-            <div key={badge.label} className="flex items-center gap-1.5">
-              <div
-                className={cn(
-                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
-                  badge.bg
-                )}
-              >
-                <badge.icon className={cn("h-3.5 w-3.5", badge.color)} />
-              </div>
-              <span className="text-xs font-semibold text-foreground sm:text-sm">
-                {badge.label}
-              </span>
-              {i < trustBadges.length - 1 && (
-                <span className="ml-2 hidden text-border sm:inline">|</span>
-              )}
-            </div>
-          ))}
-          </div>
-        </div>
-
         {/* Category tabs */}
         <div className="flex flex-wrap items-center gap-2">
           <button

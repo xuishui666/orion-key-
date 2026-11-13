@@ -43,6 +43,7 @@ const zh = {
 
   // Product Detail
   "product.buyNow": "立即购买",
+  "home.viewProductDetails": "点击查看详情",
   "product.addToCart": "加入购物车",
   "product.selectSpec": "选择规格",
   "product.quantity": "数量",
@@ -646,6 +647,7 @@ const en: Record<keyof typeof zh, string> = {
 
   // Product Detail
   "product.buyNow": "Buy Now",
+  "home.viewProductDetails": "View details",
   "product.addToCart": "Add to Cart",
   "product.selectSpec": "Select Spec",
   "product.quantity": "Quantity",

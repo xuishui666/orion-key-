@@ -250,9 +250,10 @@ export default function OrderQueryPage() {
       {/* Search Form */}
       <div className="rounded-lg border border-border bg-card p-4">
         <label htmlFor="lookup-password" className="mb-1.5 block text-sm font-medium">查询密码</label>
-        <input id="lookup-password" type="password" autoComplete="current-password" maxLength={72}
+        <input id="lookup-password" type="password" autoComplete="current-password" aria-describedby="lookup-password-hint" maxLength={72}
           value={lookupPassword} onChange={event => setLookupPassword(event.target.value)}
           className="mb-3 h-10 w-full rounded-md border border-input bg-background px-3 text-sm" />
+        <p id="lookup-password-hint" className="mb-3 text-xs text-muted-foreground">请输入下单时设置的查询密码</p>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <input
@@ -288,7 +289,6 @@ export default function OrderQueryPage() {
           </button>
         </div>
         {queryError && <p role="alert" className="mt-3 text-sm text-destructive">{queryError}</p>}
-        <p className="mt-2 text-xs text-muted-foreground">跨设备查询需提供下单时设置的查询密码。旧订单或忘记密码请联系客服核实支付记录。</p>
       </div>
 
       {/* Results — 有查询结果时优先展示在最近订单上方 */}

@@ -2,9 +2,9 @@
 
 import { useState, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { Zap, Minus, Plus, ShoppingCart, Package, TrendingUp } from "lucide-react"
+import { Zap, Minus, Plus, Package, TrendingUp } from "lucide-react"
 import { toast } from "sonner"
-import { useLocale, useAuth, useCart } from "@/lib/context"
+import { useLocale, useAuth } from "@/lib/context"
 import { orderApi, withMockFallback, getApiErrorMessage } from "@/services/api"
 import { mockCreateOrder } from "@/lib/mock-data"
 import { Turnstile, useTurnstile } from "@/components/shared/turnstile"
@@ -13,15 +13,17 @@ import { PaymentSelector } from "@/components/shared/payment-selector"
 import { OrderLookupPassword } from "@/components/shared/order-lookup-password"
 import type { ProductDetail, ProductSpec, PaymentChannelItem } from "@/types"
 
+import type { ReactNode } from "react"
+
 interface ProductActionsProps {
+  children: ReactNode
   product: ProductDetail
   channels: PaymentChannelItem[]
 }
 
-export function ProductActions({ product, channels }: ProductActionsProps) {
+export function ProductActions({ product, channels, children }: ProductActionsProps) {
   const { t } = useLocale()
   const { isLoggedIn } = useAuth()
-  const { addItem } = useCart()
   const router = useRouter()
   const emailInputRef = useRef<HTMLInputElement>(null)
 
@@ -111,23 +113,6 @@ export function ProductActions({ product, channels }: ProductActionsProps) {
     }
   }
 
-  const handleAddToCart = async () => {
-    if (product.specs.length > 0 && !selectedSpec) return
-    if (isOutOfStock) {
-      toast.error(t("product.outOfStock"))
-      return
-    }
-    try {
-      await addItem({
-        product_id: product.id,
-        spec_id: selectedSpec?.id ?? null,
-        quantity,
-      })
-      toast.success(t("product.addToCart"))
-    } catch (err: unknown) {
-      toast.error(getApiErrorMessage(err, t))
-    }
-  }
 
   return (
     <div className="lg:sticky lg:top-4 flex flex-col gap-4">
@@ -201,14 +186,16 @@ export function ProductActions({ product, channels }: ProductActionsProps) {
               {product.specs.map((spec) => (
                 <button
                   key={spec.id}
+                  type="button"
+                  aria-pressed={selectedSpec?.id === spec.id}
                   onClick={() => {
                     setSelectedSpec(spec)
                     setQuantity(1)
                   }}
                   className={cn(
-                    "rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
+                    "min-h-11 max-w-full break-words rounded-lg border-2 px-4 py-2 text-sm font-semibold transition-colors",
                     selectedSpec?.id === spec.id
-                      ? "border-primary bg-primary/10 text-primary"
+                      ? "border-primary bg-primary/10 text-primary ring-1 ring-primary"
                       : "border-border text-foreground hover:border-primary/30"
                   )}
                   disabled={spec.stock_available === 0}
@@ -225,6 +212,8 @@ export function ProductActions({ product, channels }: ProductActionsProps) {
           </div>
         )}
       </div>
+
+      {children}
 
       {/* Action area */}
       <div className="rounded-lg border border-border p-4 space-y-4">
@@ -328,14 +317,6 @@ export function ProductActions({ product, channels }: ProductActionsProps) {
               <Zap className="h-4 w-4" />
             )}
             {isOutOfStock ? t("product.outOfStock") : t("product.buyNow")}
-          </button>
-          <button
-            onClick={handleAddToCart}
-            disabled={isOutOfStock}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-5 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-          >
-            <ShoppingCart className="h-4 w-4" />
-            {t("product.addToCart")}
           </button>
         </div>
       </div>

@@ -110,12 +110,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
         {/* Right: Interactive purchase section */}
         <div className="lg:col-span-3">
-          <ProductActions product={product} channels={channels} />
+          <ProductActions product={product} channels={channels}>
+            <ProductDescription product={product} />
+          </ProductActions>
         </div>
       </div>
-
-      {/* Product Description */}
-      <ProductDescription product={product} />
 
       {/* Scroll to top */}
       <ScrollToTop />

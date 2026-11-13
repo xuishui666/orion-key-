@@ -21,14 +21,15 @@ export function HomeAnnouncement({ title, body, font, size, color, groupUrl, gro
   const bodySize = Number.isInteger(Number(size)) && Number(size) >= 14 && Number(size) <= 22 ? Number(size) : 16
   const textColor = color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : undefined
 
+  const [firstLine, ...remainingLines] = body.trim().split(/\r?\n/)
+
   return (
     <section aria-label="首页公告" className="border-y border-border bg-card/60 px-5 py-5 sm:px-8 sm:py-6">
       <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
         <Megaphone className="h-4 w-4" aria-hidden="true" />
-        <span>公告</span>
+        <h1>{title || "公告"}</h1>
       </div>
       <div className="mt-3 break-words" style={{ fontFamily: fonts[font ?? ""] ?? fonts.sans, color: textColor }}>
-        {title && <h1 className="font-bold leading-tight" style={{ fontSize: bodySize + 10 }}>{title}</h1>}
         {body && (
           <div className="mt-2 space-y-2 whitespace-pre-line leading-relaxed" style={{ fontSize: bodySize }}>
             <ReactMarkdown
@@ -41,7 +42,23 @@ export function HomeAnnouncement({ title, body, font, size, color, groupUrl, gro
                 ul: ({ children }) => <ul className="list-disc pl-5">{children}</ul>,
                 ol: ({ children }) => <ol className="list-decimal pl-5">{children}</ol>,
               }}
-            >{body}</ReactMarkdown>
+            >{firstLine}</ReactMarkdown>
+            {remainingLines.some(line => line.trim()) && (
+              <details className="mt-2">
+                <summary className="cursor-pointer text-sm font-medium">展开公告</summary>
+                <ReactMarkdown
+              allowedElements={["p", "strong", "em", "a", "ul", "ol", "li", "br"]}
+              unwrapDisallowed
+              components={{
+                a: ({ href, children }) => /^https?:\/\//i.test(href ?? "")
+                  ? <a href={href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">{children}</a>
+                  : <span>{children}</span>,
+                ul: ({ children }) => <ul className="list-disc pl-5">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal pl-5">{children}</ol>,
+              }}
+            >{remainingLines.join("\n")}</ReactMarkdown>
+              </details>
+            )}
           </div>
         )}
       </div>
