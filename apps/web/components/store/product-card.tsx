@@ -4,7 +4,7 @@ import Link from "next/link"
 import { Zap, Package, AlertTriangle } from "lucide-react"
 import type { ProductCard as ProductCardType } from "@/types"
 import { useLocale } from "@/lib/context"
-import { cn } from "@/lib/utils"
+import { cn, getCurrencySymbol } from "@/lib/utils"
 
 interface ProductCardProps {
   product: ProductCardType
@@ -81,12 +81,25 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
         </div>
 
-        <div className="mt-auto flex justify-end border-t border-border/40 pt-2">
+        <div className="mt-auto flex items-center justify-between gap-1 border-t border-border/40 pt-2">
+          <div className="flex flex-wrap items-baseline gap-x-0.5">
+            <span className="text-sm font-extrabold text-primary">
+              {getCurrencySymbol(product.currency)}
+            </span>
+            <span className="text-xl font-extrabold tracking-tight text-primary">
+              {product.base_price.toFixed(2)}
+            </span>
+            {product.has_specs && (
+              <span className="ml-0.5 text-xs text-muted-foreground">
+                {t("home.startFrom")}
+              </span>
+            )}
+          </div>
           <Link
             href={productUrl}
-            className="scheme-glow inline-flex cursor-pointer items-center rounded-lg bg-primary px-3.5 py-1.5 text-sm font-bold text-primary-foreground transition-all hover:brightness-110"
+            className="scheme-glow inline-flex shrink-0 cursor-pointer items-center rounded-lg bg-primary px-2 py-1.5 text-sm font-bold text-primary-foreground transition-all hover:brightness-110 sm:px-3.5"
           >
-            {t("home.viewProductDetails")}
+            {t("product.buyNow")}
           </Link>
         </div>
       </div>
